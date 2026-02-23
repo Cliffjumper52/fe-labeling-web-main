@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+.login-page {
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px 16px;
+	background: #f2f2f2;
+}
+
+.login-card-wrapper {
+	width: 100%;
+	max-width: 420px;
+}
+
+.login-title {
+	text-align: center;
+	font-size: 28px;
+	font-weight: 800;
+	margin-bottom: 20px;
+	color: #111827;
+	text-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+}
+
+.login-card {
+	background: #ffffff;
+	border-radius: 12px;
+	border: 1px solid #e5e7eb;
+	box-shadow: 0 12px 30px rgba(15, 23, 42, 0.15);
+	overflow: hidden;
+}
+
+.login-card-body {
+	padding: 24px;
+}
+
+.login-card-footer {
+	padding: 0 24px 20px;
+}
+
+.login-card-divider {
+	height: 1px;
+	background: #e5e7eb;
+	margin: 12px 0 10px;
+}
+
+.login-footer-text {
+	text-align: center;
+	font-size: 13px;
+	color: #6b7280;
+}
+
+
+.modal-pop {
+	animation: modal-pop 0.2s ease-out;
+	transform-origin: center;
+	box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+	animation-fill-mode: both;
+}
+
+.modal-pop-out {
+	animation: modal-pop-out 0.1s ease-in;
+	transform-origin: center;
+	animation-fill-mode: both;
+}
+
+@keyframes modal-pop {
+	from {
+		transform: scale(0.96);
+		opacity: 0;
+	}
+	to {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+
+@keyframes modal-pop-out {
+	from {
+		transform: scale(1);
+		opacity: 1;
+	}
+	to {
+		transform: scale(0.96);
+		opacity: 0;
+	}
+}
