@@ -30,6 +30,30 @@ export const router: RouterItem[] = [
     sidebar: React.lazy(
       () => import("../components/common/sidebar/admin-sidebar"),
     ),
+    children: [
+      {
+        path: "dashboard",
+        Component: React.lazy(
+          () => import("../pages/admin-dashboard/page"),
+        ),
+      },
+      {
+        path: "accounts",
+        Component: React.lazy(() => import("../pages/admin-accounts/page")),
+      },
+      {
+        path: "projects",
+        Component: React.lazy(() => import("../pages/admin-projects/page")),
+      },
+      {
+        path: "labels",
+        Component: React.lazy(() => import("../pages/admin-labels/page")),
+      },
+      {
+        path: "presets",
+        Component: React.lazy(() => import("../pages/admin-presets/page")),
+      },
+    ],
   },
   {
     layout: React.lazy(
