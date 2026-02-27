@@ -12,7 +12,7 @@ type Project = {
   name: string;
   description?: string;
   status: "Drafting" | "Active" | "Archived";
-  totalImages: number;
+  dataType: "Image" | "Video" | "Text" | "Audio";
   createdAt: string;
 };
 
@@ -24,12 +24,26 @@ type Preset = {
   createdAt: string;
 };
 
-export default function ManagerProjectsPage() {
-  const [projects, setProjects] = useState<Project[]>([]);
+type ManagerProjectsPageProps = {
+  mode?: "manager" | "admin";
+  initialProjects?: Project[];
+};
+
+export default function ManagerProjectsPage({
+  mode = "manager",
+  initialProjects,
+}: ManagerProjectsPageProps) {
+  const isAdmin = mode === "admin";
+  const [projects, setProjects] = useState<Project[]>(
+    () => initialProjects ?? [],
+  );
   const hasProjects = projects.length > 0;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
+  const [projectDataType, setProjectDataType] = useState<Project["dataType"]>(
+    "Image",
+  );
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [presets] = useState<Preset[]>([]);
@@ -65,7 +79,7 @@ export default function ManagerProjectsPage() {
         name: projectName.trim() || "Untitled Project",
         description: projectDescription.trim(),
         status: "Drafting",
-        totalImages: 0,
+        dataType: projectDataType,
         createdAt,
       },
       ...prev,
@@ -73,6 +87,7 @@ export default function ManagerProjectsPage() {
     setIsCreateOpen(false);
     setProjectName("");
     setProjectDescription("");
+    setProjectDataType("Image");
   };
 
   const handleOpenEdit = (project: Project) => {
@@ -114,18 +129,24 @@ export default function ManagerProjectsPage() {
     }, 200);
   };
 
+  const handleDeleteProject = (projectId: string) => {
+    setProjects((prev) => prev.filter((project) => project.id !== projectId));
+  };
+
   return (
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-800">Projects</h2>
-        <button
-          type="button"
-          onClick={() => setIsCreateOpen(true)}
-          className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-        >
-          <span className="text-lg leading-none">+</span>
-          New Project
-        </button>
+        {!isAdmin && (
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+          >
+            <span className="text-lg leading-none">+</span>
+            New Project
+          </button>
+        )}
       </div>
 
       <div className="mb-4 h-px w-full bg-gray-200" />
@@ -164,7 +185,7 @@ export default function ManagerProjectsPage() {
           <label className="text-xs font-semibold text-gray-700">Order by</label>
           <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
             <option>Name</option>
-            <option>Created</option>
+            <option>Date created</option>
             <option>Updated</option>
           </select>
         </div>
@@ -192,48 +213,55 @@ export default function ManagerProjectsPage() {
               <path d="M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-gray-800">No Projects Yet</h3>
+          <h3 className="text-lg font-semibold text-gray-800">
+            No Projects Yet
+          </h3>
           <p className="mt-1 text-sm text-gray-500">
-            Get started by creating your first data labeling project
+            {isAdmin
+              ? "No projects are available right now."
+              : "Get started by creating your first data labeling project"}
           </p>
-          <button
-            type="button"
-            onClick={() => setIsCreateOpen(true)}
-            className="mt-5 flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-          >
-            <span className="text-base leading-none">+</span>
-            Create Project
-          </button>
+          {!isAdmin && (
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(true)}
+              className="mt-5 flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+            >
+              <span className="text-base leading-none">+</span>
+              Create Project
+            </button>
+          )}
         </div>
       ) : (
         <div className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
-          <div className="grid grid-cols-[2.2fr_1fr_1fr_1fr_1fr] items-center gap-2 border-b bg-gray-50 px-4 py-3 text-xs font-semibold uppercase text-gray-600">
-            <span>Project name</span>
+          <div className="grid grid-cols-[1.6fr_2.2fr_1fr_1fr_1fr_0.8fr] items-center gap-2 border-b bg-gray-50 px-4 py-3 text-xs font-semibold uppercase text-gray-600">
+            <span>Name</span>
+            <span>Description</span>
             <span>Status</span>
-            <span>Total images</span>
-            <span>Created at</span>
+            <span>Data type</span>
+            <span>Date created</span>
             <span>Action</span>
           </div>
 
           {projects.map((project) => (
             <div
               key={project.id}
-              className="grid grid-cols-[2.2fr_1fr_1fr_1fr_1fr] items-center gap-2 border-b px-4 py-3 text-sm last:border-b-0"
+              className="grid grid-cols-[1.6fr_2.2fr_1fr_1fr_1fr_0.8fr] items-center gap-2 border-b px-4 py-3 text-sm last:border-b-0"
             >
               <div>
                 <p className="font-medium text-gray-800">{project.name}</p>
-                {project.description && (
-                  <p className="mt-1 text-xs text-gray-500 line-clamp-1">
-                    {project.description}
-                  </p>
-                )}
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">
+                  {project.description || "No description"}
+                </p>
               </div>
               <div>
                 <span className="rounded-md bg-gray-200 px-3 py-1 text-xs font-semibold text-gray-700">
                   {project.status}
                 </span>
               </div>
-              <span className="text-gray-700">{project.totalImages}</span>
+              <span className="text-gray-700">{project.dataType}</span>
               <span className="text-gray-700">{project.createdAt}</span>
               <div className="flex items-center gap-3 text-sm font-semibold">
                 <button
@@ -243,20 +271,30 @@ export default function ManagerProjectsPage() {
                 >
                   Details
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleOpenEdit(project)}
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  Edit
-                </button>
+                {isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteProject(project.id)}
+                    className="text-red-500 hover:text-red-600"
+                  >
+                    Delete
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(project)}
+                    className="text-blue-600 hover:text-blue-700"
+                  >
+                    Edit
+                  </button>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {isCreateOpen && (
+      {!isAdmin && isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
           <div
             className={`w-full max-w-md rounded-lg border border-gray-300 bg-white shadow-xl ${
@@ -310,6 +348,24 @@ export default function ManagerProjectsPage() {
                   className="min-h-[120px] rounded-md border border-gray-300 px-3 py-2 text-sm"
                   placeholder="Example description"
                 />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-700">
+                  Data type
+                </label>
+                <select
+                  value={projectDataType}
+                  onChange={(event) =>
+                    setProjectDataType(event.target.value as Project["dataType"])
+                  }
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="Image">Image</option>
+                  <option value="Video">Video</option>
+                  <option value="Text">Text</option>
+                  <option value="Audio">Audio</option>
+                </select>
               </div>
 
               <div className="flex justify-end">
@@ -373,7 +429,7 @@ export default function ManagerProjectsPage() {
                 </div>
                 <div className="rounded-md border border-gray-200 p-3">
                   <p className="text-xs font-semibold text-gray-700">
-                    Assinged Reviewer
+                    Assigned Reviewer
                   </p>
                   <p className="mt-2 text-sm text-gray-800">Example Reviewer</p>
                 </div>

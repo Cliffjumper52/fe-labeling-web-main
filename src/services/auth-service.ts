@@ -2,6 +2,15 @@ import api from "../api/axios";
 
 export const login = async (username: string, password: string) => {
   try {
+    if (username === "admin@gmail.com" && password === "123") {
+      return {
+        data: {
+          accessToken: "admin-access-token",
+          refreshToken: "admin-refresh-token",
+          user: { username, role: "admin" },
+        },
+      } as any;
+    }
     if (username === "manager@gmail.com" && password === "123") {
       return {
         data: {

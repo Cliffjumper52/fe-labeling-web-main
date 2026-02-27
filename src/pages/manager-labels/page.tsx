@@ -14,8 +14,17 @@ type Label = {
   createdAt: string;
 };
 
-export default function ManagerLabelsPage() {
-  const [labels, setLabels] = useState<Label[]>([]);
+type ManagerLabelsPageProps = {
+  mode?: "manager" | "admin";
+  initialLabels?: Label[];
+};
+
+export default function ManagerLabelsPage({
+  mode = "manager",
+  initialLabels,
+}: ManagerLabelsPageProps) {
+  const isAdmin = mode === "admin";
+  const [labels, setLabels] = useState<Label[]>(() => initialLabels ?? []);
   const hasLabels = labels.length > 0;
   const [isCreateLabelOpen, setIsCreateLabelOpen] = useState(false);
   const [labelName, setLabelName] = useState("");
@@ -24,6 +33,8 @@ export default function ManagerLabelsPage() {
   const [labelClasses] = useState(0);
   const [isEditLabelOpen, setIsEditLabelOpen] = useState(false);
   const [activeLabel, setActiveLabel] = useState<Label | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [detailLabel, setDetailLabel] = useState<Label | null>(null);
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
@@ -54,6 +65,15 @@ export default function ManagerLabelsPage() {
     setIsEditLabelOpen(true);
   };
 
+  const handleOpenLabelDetails = (label: Label) => {
+    setDetailLabel(label);
+    setIsDetailOpen(true);
+  };
+
+  const handleDeleteLabel = (labelId: string) => {
+    setLabels((prev) => prev.filter((label) => label.id !== labelId));
+  };
+
   const closeWithAnimation = (
     key: string,
     closeFn: Dispatch<SetStateAction<boolean>>,
@@ -73,14 +93,16 @@ export default function ManagerLabelsPage() {
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-800">Labels</h2>
-        <button
-          type="button"
-          onClick={() => setIsCreateLabelOpen(true)}
-          className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-        >
-          <span className="text-lg leading-none">+</span>
-          New Label
-        </button>
+        {!isAdmin && (
+          <button
+            type="button"
+            onClick={() => setIsCreateLabelOpen(true)}
+            className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+          >
+            <span className="text-lg leading-none">+</span>
+            New Label
+          </button>
+        )}
       </div>
 
       <div className="mb-4 h-px w-full bg-gray-200" />
@@ -120,7 +142,7 @@ export default function ManagerLabelsPage() {
           <label className="text-xs font-semibold text-gray-700">Order by</label>
           <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
             <option>Name</option>
-            <option>Created</option>
+            <option>Date created</option>
             <option>Updated</option>
           </select>
         </div>
@@ -150,65 +172,82 @@ export default function ManagerLabelsPage() {
           </div>
           <h3 className="text-lg font-semibold text-gray-800">No Labels Yet</h3>
           <p className="mt-1 text-sm text-gray-500">
-            Create your first label configuration for upcoming projects
+            {isAdmin
+              ? "No labels are available right now."
+              : "Create your first label configuration for upcoming projects"}
           </p>
-          <button
-            type="button"
-            onClick={() => setIsCreateLabelOpen(true)}
-            className="mt-5 flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-          >
-            <span className="text-base leading-none">+</span>
-            Create Label
-          </button>
+          {!isAdmin && (
+            <button
+              type="button"
+              onClick={() => setIsCreateLabelOpen(true)}
+              className="mt-5 flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+            >
+              <span className="text-base leading-none">+</span>
+              Create Label
+            </button>
+          )}
         </div>
       ) : (
         <div className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
-          <div className="grid grid-cols-[2.2fr_1fr_1fr_1fr_1fr] items-center gap-2 border-b bg-gray-50 px-4 py-3 text-xs font-semibold uppercase text-gray-600">
-            <span>Label name</span>
-            <span>Type</span>
-            <span>Total classes</span>
-            <span>Created at</span>
+          <div className="grid grid-cols-[1.6fr_2fr_1fr_1fr_0.8fr] items-center gap-2 border-b bg-gray-50 px-4 py-3 text-xs font-semibold uppercase text-gray-600">
+            <span>Name</span>
+            <span>Description</span>
+            <span>Category</span>
+            <span>Date created</span>
             <span>Action</span>
           </div>
 
           {labels.map((label) => (
             <div
               key={label.id}
-              className="grid grid-cols-[2.2fr_1fr_1fr_1fr_1fr] items-center gap-2 border-b px-4 py-3 text-sm last:border-b-0"
+              className="grid grid-cols-[1.6fr_2fr_1fr_1fr_0.8fr] items-center gap-2 border-b px-4 py-3 text-sm last:border-b-0"
             >
               <div>
                 <p className="font-medium text-gray-800">{label.name}</p>
-                {label.description && (
-                  <p className="mt-1 text-xs text-gray-500 line-clamp-1">
-                    {label.description}
-                  </p>
-                )}
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">
+                  {label.description || "No description"}
+                </p>
               </div>
               <div>
                 <span className="rounded-md bg-gray-200 px-3 py-1 text-xs font-semibold text-gray-700">
                   {label.type}
                 </span>
               </div>
-              <span className="text-gray-700">{label.totalClasses}</span>
               <span className="text-gray-700">{label.createdAt}</span>
               <div className="flex items-center gap-3 text-sm font-semibold">
-                <button type="button" className="text-blue-600 hover:text-blue-700">
-                  Details
-                </button>
                 <button
                   type="button"
-                  onClick={() => handleOpenLabelEdit(label)}
+                  onClick={() => handleOpenLabelDetails(label)}
                   className="text-blue-600 hover:text-blue-700"
                 >
-                  Edit
+                  Details
                 </button>
+                {isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteLabel(label.id)}
+                    className="text-red-500 hover:text-red-600"
+                  >
+                    Delete
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenLabelEdit(label)}
+                    className="text-blue-600 hover:text-blue-700"
+                  >
+                    Edit
+                  </button>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {isCreateLabelOpen && (
+      {!isAdmin && isCreateLabelOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
           <div
             className={`w-full max-w-md rounded-lg border border-gray-300 bg-white shadow-xl ${
@@ -324,6 +363,61 @@ export default function ManagerLabelsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isDetailOpen && detailLabel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div
+            className={`w-full max-w-lg rounded-lg border border-gray-300 bg-white shadow-xl ${
+              closingModals.labelDetails ? "modal-pop-out" : "modal-pop"
+            }`}
+          >
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h3 className="text-sm font-semibold text-gray-800">Label details</h3>
+              <button
+                type="button"
+                onClick={() => closeWithAnimation("labelDetails", setIsDetailOpen)}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4">
+              <div className="rounded-md border border-gray-200 p-3 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-gray-900">
+                      {detailLabel.name}
+                    </h2>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {detailLabel.description || "No description provided"}
+                    </p>
+                  </div>
+                  <span className="rounded-md bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                    {detailLabel.type}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-md border border-gray-200 p-3">
+                  <p className="text-xs font-semibold text-gray-700">
+                    Total classes
+                  </p>
+                  <p className="mt-2 text-sm text-gray-800">
+                    {detailLabel.totalClasses}
+                  </p>
+                </div>
+                <div className="rounded-md border border-gray-200 p-3">
+                  <p className="text-xs font-semibold text-gray-700">Date created</p>
+                  <p className="mt-2 text-sm text-gray-800">
+                    {detailLabel.createdAt}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

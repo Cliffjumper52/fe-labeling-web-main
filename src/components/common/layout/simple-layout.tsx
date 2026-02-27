@@ -20,22 +20,26 @@ export default function SimpleLayout({
     sidebarPosition === "left" ? "flex-row" : "flex-row-reverse";
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <SimpleHeader />
+    <div className="app-shell">
+      <div className="app-canvas">
+        <SimpleHeader />
 
-      <div
-        className={`flex ${wrapperDirection} h-full items-start flex-1 w-full`}
-      >
-        {sidebar && (
-          <aside className={`flex-none ${sidebarClassName}`}>{sidebar}</aside>
-        )}
+        <div className={`app-body ${wrapperDirection}`}>
+          {sidebar && (
+            <aside className={`app-sidebar flex-none ${sidebarClassName}`}>
+              {sidebar}
+            </aside>
+          )}
 
-        <main className={`flex-1 ${mainClassName}`}>
-          <Outlet />
-        </main>
+          <main className={`app-main ${mainClassName}`}>
+            <div className="app-main-inner surface-muted p-6">
+              <Outlet />
+            </div>
+          </main>
+        </div>
+
+        <SimpleFooter />
       </div>
-
-      <SimpleFooter />
     </div>
   );
 }

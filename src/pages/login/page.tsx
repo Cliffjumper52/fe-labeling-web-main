@@ -18,7 +18,13 @@ export default function LoginPage() {
       if (accessToken) localStorage.setItem("accessToken", accessToken);
       if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
       toast.success("Login successful");
-      navigate(role === "manager" ? "/manager" : "/annotator");
+      if (role === "admin") {
+        navigate("/admin");
+      } else if (role === "manager") {
+        navigate("/manager");
+      } else {
+        navigate("/annotator");
+      }
     } catch (error) {
       toast.error("Login failed");
     } finally {
@@ -29,18 +35,54 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card-wrapper">
-        <h1 className="login-title">Data labeling app</h1>
+        <h1 className="login-title">Data Labeling Studio</h1>
 
         <div className="login-card">
-          <div className="login-card-body">
-            <LoginForm onLogin={handleLogin} isLoading={isLoading} />
-          </div>
+          <aside className="login-aside">
+            <div>
+              <h2>Enterprise-grade labeling operations</h2>
+              <p>
+                Track projects, label taxonomies, and preset templates across teams
+                in a single control room designed for scale.
+              </p>
+            </div>
 
-          <div className="login-card-footer">
-            <div className="login-card-divider" />
-            <p className="login-footer-text">
-              Need access? Contact your system administrator
+            <div className="login-metrics">
+              <div className="login-metric">
+                <span>Active projects</span>
+                <strong>18</strong>
+              </div>
+              <div className="login-metric">
+                <span>Labels in use</span>
+                <strong>94</strong>
+              </div>
+              <div className="login-metric">
+                <span>Review queue</span>
+                <strong>1,240</strong>
+              </div>
+              <div className="login-metric">
+                <span>Avg. QA time</span>
+                <strong>3.2h</strong>
+              </div>
+            </div>
+
+            <p>
+              Signed-in roles automatically route to admin, manager, or annotator
+              workspaces.
             </p>
+          </aside>
+
+          <div>
+            <div className="login-card-body">
+              <LoginForm onLogin={handleLogin} isLoading={isLoading} />
+            </div>
+
+            <div className="login-card-footer">
+              <div className="login-card-divider" />
+              <p className="login-footer-text">
+                Need access? Contact your system administrator
+              </p>
+            </div>
           </div>
         </div>
       </div>
