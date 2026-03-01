@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -33,8 +34,87 @@ type TeamMember = {
   workload: string;
 };
 
+type UploadedImage = {
+  name: string;
+  dataUrl: string;
+};
+
 const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
 const ANNOTATOR_TASKS_UPDATED_EVENT = "annotator-tasks-updated";
+const ADMIN_USERS_STORAGE_KEY = "admin-users";
+const ADMIN_USERS_UPDATED_EVENT = "admin-users-updated";
+
+type AdminStorageUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: "Admin" | "Manager" | "Reviewer" | "Annotator";
+  status: "Active" | "Suspended";
+  phone: string;
+};
+
+const fallbackAnnotators: TeamMember[] = [
+  {
+    id: "ann-1",
+    name: "Annotator A",
+    email: "annotator.a@labeling.io",
+    workload: "12 tasks",
+  },
+  {
+    id: "ann-2",
+    name: "Annotator B",
+    email: "annotator.b@labeling.io",
+    workload: "8 tasks",
+  },
+  {
+    id: "ann-3",
+    name: "Annotator C",
+    email: "annotator.c@labeling.io",
+    workload: "5 tasks",
+  },
+];
+
+const fallbackReviewers: TeamMember[] = [
+  {
+    id: "rev-1",
+    name: "Reviewer A",
+    email: "reviewer.a@labeling.io",
+    workload: "18 tasks",
+  },
+  {
+    id: "rev-2",
+    name: "Reviewer B",
+    email: "reviewer.b@labeling.io",
+    workload: "11 tasks",
+  },
+];
+
+const readTeamMembersByRole = (
+  role: "Annotator" | "Reviewer",
+  fallback: TeamMember[],
+): TeamMember[] => {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+  const raw = localStorage.getItem(ADMIN_USERS_STORAGE_KEY);
+  if (!raw) {
+    return fallback;
+  }
+  try {
+    const users = JSON.parse(raw) as AdminStorageUser[];
+    const members = users
+      .filter((user) => user.role === role && user.status === "Active")
+      .map((user) => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        workload: "0 tasks",
+      }));
+    return members.length > 0 ? members : fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 type ManagerProjectsPageProps = {
   mode?: "manager" | "admin";
@@ -78,6 +158,7 @@ export default function ManagerProjectsPage({
   const [selectedUploadFiles, setSelectedUploadFiles] = useState<File[]>([]);
   const [uploadName, setUploadName] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailProject, setDetailProject] = useState<Project | null>(null);
@@ -88,40 +169,12 @@ export default function ManagerProjectsPage({
   const [selectedAnnotators, setSelectedAnnotators] = useState<string[]>([]);
   const [selectedReviewers, setSelectedReviewers] = useState<string[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
-  const annotators: TeamMember[] = [
-    {
-      id: "ann-1",
-      name: "Annotator A",
-      email: "annotator.a@labeling.io",
-      workload: "12 tasks",
-    },
-    {
-      id: "ann-2",
-      name: "Annotator B",
-      email: "annotator.b@labeling.io",
-      workload: "8 tasks",
-    },
-    {
-      id: "ann-3",
-      name: "Annotator C",
-      email: "annotator.c@labeling.io",
-      workload: "5 tasks",
-    },
-  ];
-  const reviewers: TeamMember[] = [
-    {
-      id: "rev-1",
-      name: "Reviewer A",
-      email: "reviewer.a@labeling.io",
-      workload: "18 tasks",
-    },
-    {
-      id: "rev-2",
-      name: "Reviewer B",
-      email: "reviewer.b@labeling.io",
-      workload: "11 tasks",
-    },
-  ];
+  const [annotators, setAnnotators] = useState<TeamMember[]>(() =>
+    readTeamMembersByRole("Annotator", fallbackAnnotators),
+  );
+  const [reviewers, setReviewers] = useState<TeamMember[]>(() =>
+    readTeamMembersByRole("Reviewer", fallbackReviewers),
+  );
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
@@ -166,7 +219,16 @@ export default function ManagerProjectsPage({
     setSelectedUploadFiles(files);
   };
 
-  const handleConfirmUpload = () => {
+  const readFileAsDataUrl = (file: File) => {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleConfirmUpload = async () => {
     if (selectedUploadFiles.length > 0) {
       const baseName = uploadName.trim();
       const updatedNames = selectedUploadFiles.map((file, index) => {
@@ -178,7 +240,16 @@ export default function ManagerProjectsPage({
         }
         return `${baseName}-${index + 1}`;
       });
+
+      const imagePayload = await Promise.all(
+        selectedUploadFiles.map(async (file, index) => ({
+          name: updatedNames[index],
+          dataUrl: await readFileAsDataUrl(file),
+        })),
+      );
+
       setUploadedFiles((prev) => [...prev, ...updatedNames]);
+      setUploadedImages((prev) => [...prev, ...imagePayload]);
     }
     setIsUploadOpen(false);
     setSelectedUploadFiles([]);
@@ -258,6 +329,8 @@ export default function ManagerProjectsPage({
         "All required labels are added",
         "Quality self-check completed",
       ],
+      labels: selectedPreset?.labels ?? ["Label A", "Label B"],
+      uploadedImages,
       assignedAnnotators: assignedNames,
     };
 
@@ -298,6 +371,21 @@ export default function ManagerProjectsPage({
   const resolveNames = (list: TeamMember[], ids: string[]) => {
     return ids.map((id) => list.find((item) => item.id === id)?.name || id);
   };
+
+  useEffect(() => {
+    const refreshMembers = () => {
+      setAnnotators(readTeamMembersByRole("Annotator", fallbackAnnotators));
+      setReviewers(readTeamMembersByRole("Reviewer", fallbackReviewers));
+    };
+
+    window.addEventListener("storage", refreshMembers);
+    window.addEventListener(ADMIN_USERS_UPDATED_EVENT, refreshMembers);
+
+    return () => {
+      window.removeEventListener("storage", refreshMembers);
+      window.removeEventListener(ADMIN_USERS_UPDATED_EVENT, refreshMembers);
+    };
+  }, []);
 
   return (
     <div className="w-full bg-white px-6 py-5">

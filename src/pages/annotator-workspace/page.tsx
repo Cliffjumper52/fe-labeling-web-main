@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
+
+type UploadedImage = {
+  name: string;
+  dataUrl: string;
+};
+
 type WorkspaceTask = {
   id: string;
   projectName: string;
@@ -11,6 +18,64 @@ type WorkspaceTask = {
   instructions: string[];
   checklist: string[];
   labels: string[];
+  uploadedImages?: UploadedImage[];
+};
+
+const readAssignedWorkspaceTask = (taskId?: string): WorkspaceTask | null => {
+  if (!taskId || typeof window === "undefined") {
+    return null;
+  }
+
+  const raw = localStorage.getItem(ANNOTATOR_TASKS_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const tasks = JSON.parse(raw) as Array<Record<string, unknown>>;
+    const matched = tasks.find((task) => task.id === taskId);
+    if (!matched) {
+      return null;
+    }
+
+    const uploadedImages = Array.isArray(matched.uploadedImages)
+      ? (matched.uploadedImages as UploadedImage[]).filter(
+          (item) => typeof item?.name === "string" && typeof item?.dataUrl === "string",
+        )
+      : [];
+
+    const labels = Array.isArray(matched.labels)
+      ? (matched.labels as string[]).filter((item) => typeof item === "string")
+      : ["Label A", "Label B"];
+
+    const instructions = Array.isArray(matched.instructions)
+      ? (matched.instructions as string[]).filter((item) => typeof item === "string")
+      : ["Follow manager instructions before labeling."];
+
+    const checklist = Array.isArray(matched.checklist)
+      ? (matched.checklist as string[]).filter((item) => typeof item === "string")
+      : ["Checklist completed"];
+
+    return {
+      id: String(matched.id ?? taskId),
+      projectName: String(matched.projectName ?? "Assigned Project"),
+      dataset: String(matched.dataset ?? "Manager uploaded dataset"),
+      itemName: uploadedImages[0]?.name || "item_001.png",
+      preset: String(matched.preset ?? "Custom preset"),
+      aiPrelabel:
+        matched.aiPrelabel === "Ready" ||
+        matched.aiPrelabel === "Running" ||
+        matched.aiPrelabel === "Off"
+          ? (matched.aiPrelabel as WorkspaceTask["aiPrelabel"])
+          : "Off",
+      instructions,
+      checklist,
+      labels,
+      uploadedImages,
+    };
+  } catch {
+    return null;
+  }
 };
 
 const taskMap: Record<string, WorkspaceTask> = {
@@ -77,13 +142,18 @@ const fallbackTask: WorkspaceTask = {
 
 export default function AnnotatorWorkspacePage() {
   const { id } = useParams();
-  const task = useMemo(() => taskMap[id ?? ""] ?? fallbackTask, [id]);
+  const storageTask = useMemo(() => readAssignedWorkspaceTask(id), [id]);
+  const task = useMemo(
+    () => storageTask ?? taskMap[id ?? ""] ?? fallbackTask,
+    [id, storageTask],
+  );
   const [checkedItems, setCheckedItems] = useState<boolean[]>([]);
   const [customLabels, setCustomLabels] = useState<string[]>(task.labels);
   const [newLabel, setNewLabel] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [aiApplied, setAiApplied] = useState(task.aiPrelabel === "Ready");
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   useEffect(() => {
     setCheckedItems(task.checklist.map(() => false));
@@ -92,6 +162,7 @@ export default function AnnotatorWorkspacePage() {
     setIsSubmitted(false);
     setShowSubmitConfirm(false);
     setAiApplied(task.aiPrelabel === "Ready");
+    setActiveImageIndex(0);
   }, [task]);
 
   const allChecked = checkedItems.every(Boolean);
@@ -227,9 +298,37 @@ export default function AnnotatorWorkspacePage() {
               </button>
             </div>
           </div>
-          <div className="mt-4 flex h-[360px] items-center justify-center rounded-md border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-500">
-            Canvas preview for {task.itemName}
-          </div>
+          {task.uploadedImages && task.uploadedImages.length > 0 ? (
+            <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3">
+              <div className="flex h-[320px] items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-white">
+                <img
+                  src={task.uploadedImages[activeImageIndex].dataUrl}
+                  alt={task.uploadedImages[activeImageIndex].name}
+                  className="max-h-full w-auto object-contain"
+                />
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {task.uploadedImages.map((image, index) => (
+                  <button
+                    key={image.name + index}
+                    type="button"
+                    onClick={() => setActiveImageIndex(index)}
+                    className={`rounded-md border px-2 py-1 text-xs ${
+                      index === activeImageIndex
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-gray-200 bg-white text-gray-600"
+                    }`}
+                  >
+                    {image.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 flex h-[360px] items-center justify-center rounded-md border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-500">
+              Canvas preview for {task.itemName}
+            </div>
+          )}
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-gray-600">
             <div className="rounded-md border border-gray-200 bg-white px-3 py-2">
               <p className="font-semibold text-gray-700">Detected labels</p>
