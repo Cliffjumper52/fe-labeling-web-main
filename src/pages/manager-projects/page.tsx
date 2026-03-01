@@ -50,6 +50,7 @@ export default function ManagerProjectsPage({
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedUploadFiles, setSelectedUploadFiles] = useState<File[]>([]);
   const [uploadName, setUploadName] = useState("");
+  const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailProject, setDetailProject] = useState<Project | null>(null);
@@ -106,6 +107,19 @@ export default function ManagerProjectsPage({
   };
 
   const handleConfirmUpload = () => {
+    if (selectedUploadFiles.length > 0) {
+      const baseName = uploadName.trim();
+      const updatedNames = selectedUploadFiles.map((file, index) => {
+        if (!baseName) {
+          return file.name;
+        }
+        if (selectedUploadFiles.length === 1) {
+          return baseName;
+        }
+        return `${baseName}-${index + 1}`;
+      });
+      setUploadedFiles((prev) => [...prev, ...updatedNames]);
+    }
     setIsUploadOpen(false);
     setSelectedUploadFiles([]);
     setUploadName("");
@@ -313,83 +327,87 @@ export default function ManagerProjectsPage({
               >
                 <svg
                   viewBox="0 0 24 24"
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M6 6l12 12" />
-                  <path d="M18 6l-12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleCreate} className="flex flex-col gap-4 p-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">
-                  Project name
-                </label>
-                <input
-                  value={projectName}
-                  onChange={(event) => setProjectName(event.target.value)}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="Example name"
-                  required
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">
-                  Project description
-                </label>
-                <textarea
-                  value={projectDescription}
-                  onChange={(event) => setProjectDescription(event.target.value)}
-                  className="min-h-[120px] rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="Example description"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">
-                  Data type
-                </label>
-                <select
-                  value={projectDataType}
-                  onChange={(event) =>
-                    setProjectDataType(event.target.value as Project["dataType"])
-                  }
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                >
-                  <option value="Image">Image</option>
-                  <option value="Video">Video</option>
-                  <option value="Text">Text</option>
-                  <option value="Audio">Audio</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-                >
-                  <span className="text-base leading-none">+</span>
-                  Create Project
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {isDetailOpen && detailProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-          <div
-            className={`w-full max-w-2xl rounded-lg border border-gray-300 bg-white shadow-xl ${
-              closingModals.projectDetails ? "modal-pop-out" : "modal-pop"
-            }`}
-          >
-            <div className="flex items-center justify-between border-b px-4 py-3">
+                  <div className="mt-2 flex flex-col gap-2">
+                    {[
+                      {
+                        id: "uploads",
+                        title: `Uploaded images (${uploadedFiles.length})`,
+                        action: "Upload File",
+                        empty: "No images uploaded",
+                        icon: (
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="h-5 w-5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M12 3v12" />
+                            <path d="m7 8 5-5 5 5" />
+                            <path d="M5 21h14" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        id: "annotators",
+                        title: "Assign annotators",
+                        action: "Assign annotators",
+                        empty: "No annotator assigned",
+                        icon: (
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="h-5 w-5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <circle cx="9" cy="7" r="3" />
+                            <circle cx="17" cy="7" r="3" />
+                            <path d="M2 21a7 7 0 0 1 14 0" />
+                            <path d="M14 21a5 5 0 0 1 8 0" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        id: "reviewers",
+                        title: "Assign reviewers",
+                        action: "Assign reviewers",
+                        empty: "No reviewer assigned",
+                        icon: (
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="h-5 w-5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <circle cx="9" cy="7" r="3" />
+                            <circle cx="17" cy="7" r="3" />
+                            <path d="M2 21a7 7 0 0 1 14 0" />
+                            <path d="M14 21a5 5 0 0 1 8 0" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        id: "presets",
+                        title: "Label Presets",
+                        action: "Add Preset",
+                        empty: "No label preset selected",
+                        icon: (
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="h-5 w-5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
+                            <path d="M16 3h5v5" />
+                            <path d="M16 8 21 3" />
+                          </svg>
+                        ),
+                      },
+                    ].map((section) => (
               <h3 className="text-base font-semibold text-gray-800">
                 Project details
               </h3>
@@ -441,16 +459,20 @@ export default function ManagerProjectsPage({
                 </div>
                 <div className="rounded-md border border-gray-200 p-3">
                   <p className="text-xs font-semibold text-gray-700">Uploaded files</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {assignedFiles.map((file) => (
-                      <span
-                        key={file}
-                        className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
-                      >
-                        {file}
-                      </span>
-                    ))}
-                  </div>
+                  {uploadedFiles.length === 0 ? (
+                    <p className="mt-2 text-xs text-gray-400">No images uploaded</p>
+                  ) : (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {uploadedFiles.map((file) => (
+                        <span
+                          key={file}
+                          className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
+                        >
+                          {file}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -602,21 +624,21 @@ export default function ManagerProjectsPage({
                       <button
                         type="button"
                         onClick={() => {
-                          if (section.title === "Uploaded images (6)") {
+                          if (section.id === "uploads") {
                             setIsUploadOpen(true);
                             return;
                           }
-                          if (section.title === "Assign annotators") {
+                          if (section.id === "annotators") {
                             setAssignSearch("");
                             setIsAssignAnnotatorsOpen(true);
                             return;
                           }
-                          if (section.title === "Assign reviewers") {
+                          if (section.id === "reviewers") {
                             setAssignSearch("");
                             setIsAssignReviewersOpen(true);
                             return;
                           }
-                          if (section.title === "Label Presets") {
+                          if (section.id === "presets") {
                             setIsSelectPresetOpen(true);
                           }
                         }}
@@ -625,9 +647,28 @@ export default function ManagerProjectsPage({
                         {section.action}
                       </button>
                     </div>
-                    <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
-                      {section.empty}
-                    </div>
+                    {section.id === "uploads" ? (
+                      uploadedFiles.length === 0 ? (
+                        <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
+                          {section.empty}
+                        </div>
+                      ) : (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {uploadedFiles.map((file) => (
+                            <span
+                              key={file}
+                              className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
+                            >
+                              {file}
+                            </span>
+                          ))}
+                        </div>
+                      )
+                    ) : (
+                      <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
+                        {section.empty}
+                      </div>
+                    )}
                   </div>
                 ))}
 
