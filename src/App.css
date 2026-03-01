@@ -34,6 +34,7 @@ body {
 		radial-gradient(circle at 10% 70%, rgba(14, 116, 144, 0.16), transparent 42%),
 		linear-gradient(120deg, #eef2f7 0%, #f7f9fc 55%, #eef2f7 100%);
 	color: var(--ink-900);
+	overflow-x: hidden;
 }
 
 h1,
@@ -50,17 +51,28 @@ h6 {
 	min-height: 100vh;
 	position: relative;
 	background: transparent;
+	width: 100%;
+	display: flex;
+	flex-direction: column;
 }
 
 .app-canvas {
 	position: relative;
 	min-height: 100vh;
 	isolation: isolate;
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+}
+
+.app-footer {
+	margin-top: auto;
 }
 
 .app-canvas::before {
 	content: "";
-	position: absolute;
+	position: fixed;
 	top: -140px;
 	right: -160px;
 	width: 360px;
@@ -68,11 +80,12 @@ h6 {
 	background: radial-gradient(circle, rgba(37, 99, 235, 0.22), transparent 70%);
 	filter: blur(10px);
 	z-index: -1;
+	pointer-events: none;
 }
 
 .app-canvas::after {
 	content: "";
-	position: absolute;
+	position: fixed;
 	bottom: -120px;
 	left: -120px;
 	width: 320px;
@@ -80,22 +93,30 @@ h6 {
 	background: radial-gradient(circle, rgba(16, 185, 129, 0.18), transparent 70%);
 	filter: blur(8px);
 	z-index: -1;
+	pointer-events: none;
 }
 
 .app-body {
 	display: flex;
 	flex: 1;
-	min-height: calc(100vh - 80px);
+	width: 100%;
+	overflow-x: hidden;
+}
+
+.app-body > * {
+	min-width: 0;
 }
 
 .app-main {
 	flex: 1;
 	padding: 24px 28px 48px;
+	min-width: 0;
 }
 
 .app-main-inner {
 	max-width: 1200px;
 	margin: 0 auto;
+	width: 100%;
 }
 
 .surface {
