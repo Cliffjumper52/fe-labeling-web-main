@@ -7,6 +7,7 @@ import {
   type MouseEvent,
   type SetStateAction,
 } from "react";
+import { createPortal } from "react-dom";
 
 type Project = {
   id: string;
@@ -146,6 +147,10 @@ export default function ManagerProjectsPage({
   const handleOpenEdit = (project: Project) => {
     setActiveProject(project);
     setIsEditOpen(true);
+    setIsUploadOpen(false);
+    setIsAssignAnnotatorsOpen(false);
+    setIsAssignReviewersOpen(false);
+    setIsSelectPresetOpen(false);
   };
 
   const handleOpenDetails = (project: Project) => {
@@ -197,6 +202,31 @@ export default function ManagerProjectsPage({
 
   const handleDeleteProject = (projectId: string) => {
     setProjects((prev) => prev.filter((project) => project.id !== projectId));
+  };
+
+  const updateProjectStatus = (status: Project["status"]) => {
+    if (!activeProject) {
+      return;
+    }
+    setProjects((prev) =>
+      prev.map((project) =>
+        project.id === activeProject.id ? { ...project, status } : project,
+      ),
+    );
+    setActiveProject((prev) => (prev ? { ...prev, status } : prev));
+    setDetailProject((prev) =>
+      prev && prev.id === activeProject.id ? { ...prev, status } : prev,
+    );
+  };
+
+  const handleSaveAsDraft = () => {
+    updateProjectStatus("Drafting");
+    closeWithAnimation("editProject", setIsEditOpen);
+  };
+
+  const handleConfirmAssigned = () => {
+    updateProjectStatus("Active");
+    closeWithAnimation("editProject", setIsEditOpen);
   };
 
   const handleOverlayClick = (
@@ -382,7 +412,7 @@ export default function ManagerProjectsPage({
         </div>
       )}
 
-      {!isAdmin && isCreateOpen && (
+      {!isAdmin && isCreateOpen && createPortal(
         <div
           className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30 px-4"
           onClick={(event) =>
@@ -473,9 +503,9 @@ export default function ManagerProjectsPage({
             </form>
           </div>
         </div>
-      )}
+      , document.body)}
 
-      {isDetailOpen && detailProject && (
+      {isDetailOpen && detailProject && createPortal(
         <div
           className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30 px-4"
           onClick={(event) =>
@@ -578,9 +608,9 @@ export default function ManagerProjectsPage({
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
-      {isEditOpen && activeProject && (
+      {isEditOpen && activeProject && createPortal(
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 px-3"
           onClick={(event) =>
@@ -858,7 +888,7 @@ export default function ManagerProjectsPage({
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-wrap justify-end gap-2">
+              <div className="sticky bottom-0 mt-3 flex flex-wrap justify-end gap-2 border-t bg-white pt-3">
                 <button
                   type="button"
                   onClick={() => closeWithAnimation("editProject", setIsEditOpen)}
@@ -868,12 +898,14 @@ export default function ManagerProjectsPage({
                 </button>
                 <button
                   type="button"
+                  onClick={handleSaveAsDraft}
                   className="rounded-md bg-gray-200 px-3 py-2 text-sm font-semibold text-gray-700"
                 >
                   Safe as drafted
                 </button>
                 <button
                   type="button"
+                  onClick={handleConfirmAssigned}
                   className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
                 >
                   Confirm as assigned
@@ -882,9 +914,9 @@ export default function ManagerProjectsPage({
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
-      {isUploadOpen && (
+      {isUploadOpen && createPortal(
         <div
           className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 px-4"
           onClick={(event) => handleOverlayClick(event, "upload", setIsUploadOpen)}
@@ -965,9 +997,9 @@ export default function ManagerProjectsPage({
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
-      {isAssignAnnotatorsOpen && (
+      {isAssignAnnotatorsOpen && createPortal(
         <div
           className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 px-4"
           onClick={(event) =>
@@ -1062,9 +1094,9 @@ export default function ManagerProjectsPage({
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
-      {isAssignReviewersOpen && (
+      {isAssignReviewersOpen && createPortal(
         <div
           className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 px-4"
           onClick={(event) =>
@@ -1159,9 +1191,9 @@ export default function ManagerProjectsPage({
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
-      {isSelectPresetOpen && (
+      {isSelectPresetOpen && createPortal(
         <div
           className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 px-4"
           onClick={(event) =>
@@ -1239,7 +1271,7 @@ export default function ManagerProjectsPage({
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }
