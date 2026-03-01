@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useState,
   type Dispatch,
@@ -23,6 +24,35 @@ type Task = {
   checklist: string[];
   reviewerNote?: string;
   errorTypes?: string[];
+  assignedAnnotators?: string[];
+};
+
+const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
+const ANNOTATOR_TASKS_UPDATED_EVENT = "annotator-tasks-updated";
+
+const readTasksFromStorage = (): Task[] => {
+  if (typeof window === "undefined") {
+    return initialTasks;
+  }
+
+  const raw = localStorage.getItem(ANNOTATOR_TASKS_STORAGE_KEY);
+  if (!raw) {
+    return initialTasks;
+  }
+
+  try {
+    const assignedTasks = JSON.parse(raw) as Task[];
+    const byId = new Map<string, Task>();
+    assignedTasks.forEach((task) => byId.set(task.id, task));
+    initialTasks.forEach((task) => {
+      if (!byId.has(task.id)) {
+        byId.set(task.id, task);
+      }
+    });
+    return Array.from(byId.values());
+  } catch {
+    return initialTasks;
+  }
 };
 
 const initialTasks: Task[] = [
@@ -104,7 +134,7 @@ const initialTasks: Task[] = [
 ];
 
 export default function AnnotatorTasksPage() {
-  const [tasks] = useState<Task[]>(() => initialTasks);
+  const [tasks, setTasks] = useState<Task[]>(() => readTasksFromStorage());
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "All">("All");
   const [priorityFilter, setPriorityFilter] = useState<
@@ -163,6 +193,20 @@ export default function AnnotatorTasksPage() {
       });
     }, 200);
   };
+
+  useEffect(() => {
+    const refreshTasks = () => {
+      setTasks(readTasksFromStorage());
+    };
+
+    window.addEventListener("storage", refreshTasks);
+    window.addEventListener(ANNOTATOR_TASKS_UPDATED_EVENT, refreshTasks);
+
+    return () => {
+      window.removeEventListener("storage", refreshTasks);
+      window.removeEventListener(ANNOTATOR_TASKS_UPDATED_EVENT, refreshTasks);
+    };
+  }, []);
 
   return (
     <div className="w-full bg-white px-6 py-5">

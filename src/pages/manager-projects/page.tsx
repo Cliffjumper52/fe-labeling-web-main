@@ -33,6 +33,9 @@ type TeamMember = {
   workload: string;
 };
 
+const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
+const ANNOTATOR_TASKS_UPDATED_EVENT = "annotator-tasks-updated";
+
 type ManagerProjectsPageProps = {
   mode?: "manager" | "admin";
   initialProjects?: Project[];
@@ -224,7 +227,52 @@ export default function ManagerProjectsPage({
     closeWithAnimation("editProject", setIsEditOpen);
   };
 
+  const pushTaskToAnnotatorQueue = () => {
+    if (!activeProject) {
+      return;
+    }
+    const assignedNames = resolveNames(annotators, selectedAnnotators);
+    const today = new Date();
+    const dueDate = new Date(today);
+    dueDate.setDate(today.getDate() + 7);
+
+    const payload = {
+      id: `task-${activeProject.id}`,
+      projectName: activeProject.name,
+      dataset:
+        uploadedFiles.length > 0
+          ? `${uploadedFiles.length} uploaded file(s)`
+          : "Manager uploaded dataset",
+      priority: "Normal" as const,
+      status: "In Progress" as const,
+      assignedAt: today.toISOString().slice(0, 10),
+      dueAt: dueDate.toISOString().slice(0, 10),
+      aiPrelabel: uploadedFiles.length > 0 ? ("Ready" as const) : ("Off" as const),
+      preset: selectedPreset?.name || "Custom preset",
+      progress: 0,
+      instructions: [
+        "Follow project guideline before labeling.",
+        "Apply selected label preset consistently.",
+      ],
+      checklist: [
+        "All required labels are added",
+        "Quality self-check completed",
+      ],
+      assignedAnnotators: assignedNames,
+    };
+
+    const raw = localStorage.getItem(ANNOTATOR_TASKS_STORAGE_KEY);
+    const existing = raw ? (JSON.parse(raw) as Array<Record<string, unknown>>) : [];
+    const next = [
+      payload,
+      ...existing.filter((item) => item.id !== payload.id),
+    ];
+    localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
+  };
+
   const handleConfirmAssigned = () => {
+    pushTaskToAnnotatorQueue();
     updateProjectStatus("Active");
     closeWithAnimation("editProject", setIsEditOpen);
   };
