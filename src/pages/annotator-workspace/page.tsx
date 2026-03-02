@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
+const ANNOTATOR_TASKS_UPDATED_EVENT = "annotator-tasks-updated";
 
 type UploadedImage = {
   name: string;
@@ -12,6 +13,7 @@ type WorkspaceTask = {
   id: string;
   projectName: string;
   dataset: string;
+  status?: "In Progress" | "Pending Review" | "Returned" | "Completed";
   itemName: string;
   preset: string;
   aiPrelabel: "Ready" | "Running" | "Off";
@@ -60,6 +62,13 @@ const readAssignedWorkspaceTask = (taskId?: string): WorkspaceTask | null => {
       id: String(matched.id ?? taskId),
       projectName: String(matched.projectName ?? "Assigned Project"),
       dataset: String(matched.dataset ?? "Manager uploaded dataset"),
+      status:
+        matched.status === "In Progress" ||
+        matched.status === "Pending Review" ||
+        matched.status === "Returned" ||
+        matched.status === "Completed"
+          ? (matched.status as WorkspaceTask["status"])
+          : "In Progress",
       itemName: uploadedImages[0]?.name || "item_001.png",
       preset: String(matched.preset ?? "Custom preset"),
       aiPrelabel:
@@ -83,6 +92,7 @@ const taskMap: Record<string, WorkspaceTask> = {
     id: "task-100",
     projectName: "Retail Shelf Audit",
     dataset: "Shelf-Images-Set-3",
+    status: "In Progress",
     itemName: "shelf_043.png",
     preset: "Retail SKU V2",
     aiPrelabel: "Ready",
@@ -102,6 +112,7 @@ const taskMap: Record<string, WorkspaceTask> = {
     id: "task-101",
     projectName: "Street Scene Vehicles",
     dataset: "Urban-Cam-12",
+    status: "Pending Review",
     itemName: "frame_0192.jpg",
     preset: "Vehicle Boxes",
     aiPrelabel: "Ready",
@@ -116,6 +127,7 @@ const taskMap: Record<string, WorkspaceTask> = {
     id: "task-102",
     projectName: "Medical Scan Classification",
     dataset: "CT-Slice-22",
+    status: "Returned",
     itemName: "slice_018.png",
     preset: "CT Findings",
     aiPrelabel: "Off",
@@ -132,6 +144,7 @@ const fallbackTask: WorkspaceTask = {
   id: "task-new",
   projectName: "New Assignment",
   dataset: "Unassigned",
+  status: "In Progress",
   itemName: "item_001.png",
   preset: "Default",
   aiPrelabel: "Running",
@@ -159,7 +172,7 @@ export default function AnnotatorWorkspacePage() {
     setCheckedItems(task.checklist.map(() => false));
     setCustomLabels(task.labels);
     setNewLabel("");
-    setIsSubmitted(false);
+    setIsSubmitted(task.status === "Pending Review" || task.status === "Completed");
     setShowSubmitConfirm(false);
     setAiApplied(task.aiPrelabel === "Ready");
     setActiveImageIndex(0);
@@ -187,6 +200,40 @@ export default function AnnotatorWorkspacePage() {
   };
 
   const handleConfirmSubmit = () => {
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem(ANNOTATOR_TASKS_STORAGE_KEY);
+
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
+          const submittedAt = new Date().toISOString().slice(0, 10);
+
+          const updated = parsed.map((item) => {
+            if (String(item.id) !== task.id) {
+              return item;
+            }
+
+            return {
+              ...item,
+              status: "Pending Review",
+              progress: 100,
+              submittedAt,
+              submittedImages: task.uploadedImages ?? [],
+              qaDecision: undefined,
+              qaReviewedAt: undefined,
+              errorTypes: [],
+              reviewerNote: "",
+            };
+          });
+
+          localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(updated));
+          window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
+        } catch {
+          // ignore malformed local data and keep UI submission state
+        }
+      }
+    }
+
     setIsSubmitted(true);
     setShowSubmitConfirm(false);
   };

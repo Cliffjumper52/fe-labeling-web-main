@@ -22,6 +22,8 @@ export default function LoginPage() {
         navigate("/admin");
       } else if (role === "manager") {
         navigate("/manager");
+      } else if (role === "reviewer") {
+        navigate("/reviewer");
       } else {
         navigate("/annotator");
       }
@@ -35,7 +37,10 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card-wrapper">
-        <h1 className="login-title">Data Labeling Studio</h1>
+        <div className="login-title-wrap">
+          <p className="login-kicker">Workspace Platform</p>
+          <h1 className="login-title">Data Labeling Studio</h1>
+        </div>
 
         <div className="login-card">
           <aside className="login-aside">
@@ -66,6 +71,13 @@ export default function LoginPage() {
               </div>
             </div>
 
+            <div className="login-role-chips">
+              <span>Admin</span>
+              <span>Manager</span>
+              <span>Annotator</span>
+              <span>Reviewer</span>
+            </div>
+
             <p>
               Signed-in roles automatically route to admin, manager, or annotator
               workspaces.
@@ -74,7 +86,15 @@ export default function LoginPage() {
 
           <div>
             <div className="login-card-body">
+              <div className="login-form-head">
+                <h3>Welcome back</h3>
+                <p>Sign in to continue to your assigned workspace.</p>
+              </div>
               <LoginForm onLogin={handleLogin} isLoading={isLoading} />
+
+              <div className="login-demo-hint">
+                Demo: admin@gmail.com / manager@gmail.com / annotator@gmail.com / reviewer@gmail.com (password: 123)
+              </div>
             </div>
 
             <div className="login-card-footer">

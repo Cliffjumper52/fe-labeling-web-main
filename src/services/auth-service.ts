@@ -32,6 +32,15 @@ export const login = async (username: string, password: string) => {
         },
       } as any;
     }
+    if (username === "reviewer@gmail.com" && password === "123") {
+      return {
+        data: {
+          accessToken: "reviewer-access-token",
+          refreshToken: "reviewer-refresh-token",
+          user: { username, role: "reviewer" },
+        },
+      } as any;
+    }
     const resp = await api.post("/auth/login", { username, password });
     return resp;
   } catch (error) {
