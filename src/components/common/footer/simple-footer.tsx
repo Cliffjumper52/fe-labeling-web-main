@@ -1,5 +1,3 @@
-import React from "react";
-
 export default function SimpleFooter() {
   return (
     <footer className="app-footer border-t border-slate-200/70 bg-white/70 px-6 py-3 text-xs text-slate-500 backdrop-blur">

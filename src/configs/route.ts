@@ -114,6 +114,16 @@ export const router: RouterItem[] = [
     sidebar: React.lazy(
       () => import("../components/common/sidebar/reviewer-sidebar"),
     ),
+    children: [
+      {
+        path: "queue",
+        Component: React.lazy(() => import("../pages/reviewer-queue/page")),
+      },
+      {
+        path: "reports",
+        Component: React.lazy(() => import("../pages/reviewer-reports/page")),
+      },
+    ],
   },
   { path: "*", Component: React.lazy(() => import("../pages/not-found/page")) },
 ];
