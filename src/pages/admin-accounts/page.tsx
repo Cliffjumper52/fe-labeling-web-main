@@ -1,4 +1,10 @@
-import { useState, type FormEvent, type Dispatch, type SetStateAction } from "react";
+import {
+  useEffect,
+  useState,
+  type FormEvent,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 
 type AdminUser = {
   id: string;
@@ -36,8 +42,27 @@ const initialUsers: AdminUser[] = [
   },
 ];
 
+const ADMIN_USERS_STORAGE_KEY = "admin-users";
+const ADMIN_USERS_UPDATED_EVENT = "admin-users-updated";
+
+const readUsersFromStorage = (): AdminUser[] => {
+  if (typeof window === "undefined") {
+    return initialUsers;
+  }
+  const raw = localStorage.getItem(ADMIN_USERS_STORAGE_KEY);
+  if (!raw) {
+    return initialUsers;
+  }
+  try {
+    const parsed = JSON.parse(raw) as AdminUser[];
+    return parsed.length > 0 ? parsed : initialUsers;
+  } catch {
+    return initialUsers;
+  }
+};
+
 export default function AdminAccountsPage() {
-  const [users, setUsers] = useState<AdminUser[]>(initialUsers);
+  const [users, setUsers] = useState<AdminUser[]>(() => readUsersFromStorage());
   const hasUsers = users.length > 0;
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [newUserName, setNewUserName] = useState("");
@@ -69,6 +94,11 @@ export default function AdminAccountsPage() {
     setNewUserRole("Annotator");
     setNewUserPhone("");
   };
+
+  useEffect(() => {
+    localStorage.setItem(ADMIN_USERS_STORAGE_KEY, JSON.stringify(users));
+    window.dispatchEvent(new CustomEvent(ADMIN_USERS_UPDATED_EVENT));
+  }, [users]);
 
   const closeWithAnimation = (
     key: string,

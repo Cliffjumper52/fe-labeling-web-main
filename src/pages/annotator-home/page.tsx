@@ -1,3 +1,5 @@
-export default function ExampleAnnotatorPage() {
-  return <div>Example Annotator Page</div>;
+import { Navigate } from "react-router-dom";
+
+export default function AnnotatorHomePage() {
+  return <Navigate to="/annotator/tasks" replace />;
 }

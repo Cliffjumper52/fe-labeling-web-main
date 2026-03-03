@@ -19,6 +19,24 @@ export const router: RouterItem[] = [
     sidebar: React.lazy(
       () => import("../components/common/sidebar/annotator-sidebar"),
     ),
+    children: [
+      {
+        path: "tasks",
+        Component: React.lazy(() => import("../pages/annotator-tasks/page")),
+      },
+      {
+        path: "submissions",
+        Component: React.lazy(
+          () => import("../pages/annotator-submissions/page"),
+        ),
+      },
+      {
+        path: "workspace/:id",
+        Component: React.lazy(
+          () => import("../pages/annotator-workspace/page"),
+        ),
+      },
+    ],
   },
   {
     layout: React.lazy(

@@ -20,6 +20,18 @@ export const login = async (username: string, password: string) => {
         },
       } as any;
     }
+    if (
+      (username === "annotator@gmail.com" || username === "anotator@gmail.com") &&
+      password === "123"
+    ) {
+      return {
+        data: {
+          accessToken: "annotator-access-token",
+          refreshToken: "annotator-refresh-token",
+          user: { username, role: "annotator" },
+        },
+      } as any;
+    }
     const resp = await api.post("/auth/login", { username, password });
     return resp;
   } catch (error) {
