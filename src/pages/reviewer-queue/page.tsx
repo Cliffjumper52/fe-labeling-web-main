@@ -17,6 +17,8 @@ type ReviewTask = {
   progress: number;
   instructions: string[];
   checklist: string[];
+  labels?: string[];
+  submittedLabels?: string[];
   reviewerNote?: string;
   errorTypes?: string[];
   assignedAnnotators?: string[];
@@ -189,6 +191,16 @@ export default function ReviewerQueuePage() {
       return task.submittedImages;
     }
     return task.uploadedImages ?? [];
+  };
+
+  const getSubmittedLabels = (task: ReviewTask) => {
+    if (task.submittedLabels && task.submittedLabels.length > 0) {
+      return task.submittedLabels;
+    }
+    if (task.labels && task.labels.length > 0) {
+      return task.labels;
+    }
+    return [];
   };
 
   const toggleErrorType = (errorType: string) => {
@@ -380,6 +392,27 @@ export default function ReviewerQueuePage() {
                       {item}
                     </div>
                   ))}
+                </div>
+              </div>
+
+              <div className="rounded-md border border-gray-200 p-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-gray-500">Submitted labels (annotator edited)</p>
+                  <span className="text-xs text-gray-500">{getSubmittedLabels(activeTask).length} labels</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {getSubmittedLabels(activeTask).length === 0 ? (
+                    <span className="text-xs text-gray-400">No submitted labels.</span>
+                  ) : (
+                    getSubmittedLabels(activeTask).map((label) => (
+                      <span
+                        key={label}
+                        className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
+                      >
+                        {label}
+                      </span>
+                    ))
+                  )}
                 </div>
               </div>
 

@@ -200,6 +200,14 @@ export default function AnnotatorWorkspacePage() {
   };
 
   const handleConfirmSubmit = () => {
+    const normalizedLabels = Array.from(
+      new Set(
+        customLabels
+          .map((label) => label.trim())
+          .filter((label) => label.length > 0),
+      ),
+    );
+
     if (typeof window !== "undefined") {
       const raw = localStorage.getItem(ANNOTATOR_TASKS_STORAGE_KEY);
 
@@ -217,6 +225,8 @@ export default function AnnotatorWorkspacePage() {
               ...item,
               status: "Pending Review",
               progress: 100,
+              labels: normalizedLabels,
+              submittedLabels: normalizedLabels,
               submittedAt,
               submittedImages: task.uploadedImages ?? [],
               qaDecision: undefined,

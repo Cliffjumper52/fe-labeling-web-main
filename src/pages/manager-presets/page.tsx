@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useState,
   type Dispatch,
   type FormEvent,
@@ -18,14 +19,44 @@ type ManagerPresetsPageProps = {
   initialPresets?: Preset[];
 };
 
+const MANAGER_PRESETS_STORAGE_KEY = "manager-presets";
+const MANAGER_PRESETS_UPDATED_EVENT = "manager-presets-updated";
+
+const readManagerPresets = (): Preset[] => {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  const raw = localStorage.getItem(MANAGER_PRESETS_STORAGE_KEY);
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Preset[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
 export default function ManagerPresetsPage({
   mode = "manager",
   initialPresets,
 }: ManagerPresetsPageProps) {
   const isAdmin = mode === "admin";
-  const [presets, setPresets] = useState<Preset[]>(
-    () => initialPresets ?? [],
-  );
+  const [presets, setPresets] = useState<Preset[]>(() => {
+    if (isAdmin) {
+      return initialPresets ?? [];
+    }
+
+    const stored = readManagerPresets();
+    if (stored.length > 0) {
+      return stored;
+    }
+
+    return initialPresets ?? [];
+  });
   const hasPresets = presets.length > 0;
   const [isCreatePresetOpen, setIsCreatePresetOpen] = useState(false);
   const [presetName, setPresetName] = useState("");
@@ -37,6 +68,22 @@ export default function ManagerPresetsPage({
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
+
+  const resetCreatePresetForm = () => {
+    setPresetName("");
+    setPresetDescription("");
+    setPresetLabelQuery("");
+    setSelectedPresetLabels([]);
+  };
+
+  useEffect(() => {
+    if (isAdmin || typeof window === "undefined") {
+      return;
+    }
+
+    localStorage.setItem(MANAGER_PRESETS_STORAGE_KEY, JSON.stringify(presets));
+    window.dispatchEvent(new CustomEvent(MANAGER_PRESETS_UPDATED_EVENT));
+  }, [isAdmin, presets]);
 
   const handleCreatePreset = (event: FormEvent) => {
     event.preventDefault();
@@ -105,7 +152,10 @@ export default function ManagerPresetsPage({
         {!isAdmin && (
           <button
             type="button"
-            onClick={() => setIsCreatePresetOpen(true)}
+            onClick={() => {
+              resetCreatePresetForm();
+              setIsCreatePresetOpen(true);
+            }}
             className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
           >
             <span className="text-lg leading-none">+</span>
@@ -139,7 +189,10 @@ export default function ManagerPresetsPage({
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Order by</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <select
+            title="Order presets by"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>Name</option>
             <option>Date created</option>
             <option>Updated</option>
@@ -148,7 +201,10 @@ export default function ManagerPresetsPage({
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Order</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <select
+            title="Preset sort order"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>All</option>
             <option>Ascending</option>
             <option>Descending</option>
@@ -157,7 +213,10 @@ export default function ManagerPresetsPage({
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Status</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <select
+            title="Preset status"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>All</option>
             <option>Active</option>
             <option>Archived</option>
@@ -187,7 +246,10 @@ export default function ManagerPresetsPage({
           {!isAdmin && (
             <button
               type="button"
-              onClick={() => setIsCreatePresetOpen(true)}
+              onClick={() => {
+                resetCreatePresetForm();
+                setIsCreatePresetOpen(true);
+              }}
               className="mt-5 flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
             >
               <span className="text-base leading-none">+</span>
