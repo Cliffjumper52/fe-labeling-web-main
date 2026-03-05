@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 
 const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
@@ -141,6 +141,17 @@ const fallbackTask: WorkspaceTask = {
 };
 
 export default function AnnotatorWorkspacePage() {
+  const ZOOM_STEPS = [
+    { value: 0.5, imageClass: "w-[50%]" },
+    { value: 0.75, imageClass: "w-[75%]" },
+    { value: 1, imageClass: "w-[100%]" },
+    { value: 1.25, imageClass: "w-[125%]" },
+    { value: 1.5, imageClass: "w-[150%]" },
+    { value: 1.75, imageClass: "w-[175%]" },
+    { value: 2, imageClass: "w-[200%]" },
+  ] as const;
+  const DEFAULT_ZOOM_INDEX = 2;
+
   const { id } = useParams();
   const storageTask = useMemo(() => readAssignedWorkspaceTask(id), [id]);
   const task = useMemo(
@@ -154,6 +165,16 @@ export default function AnnotatorWorkspacePage() {
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [aiApplied, setAiApplied] = useState(task.aiPrelabel === "Ready");
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
+  const [isPanMode, setIsPanMode] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
+  const canvasViewportRef = useRef<HTMLDivElement | null>(null);
+  const panStartRef = useRef<{
+    x: number;
+    y: number;
+    scrollLeft: number;
+    scrollTop: number;
+  } | null>(null);
 
   useEffect(() => {
     setCheckedItems(task.checklist.map(() => false));
@@ -163,6 +184,14 @@ export default function AnnotatorWorkspacePage() {
     setShowSubmitConfirm(false);
     setAiApplied(task.aiPrelabel === "Ready");
     setActiveImageIndex(0);
+    setZoomIndex(DEFAULT_ZOOM_INDEX);
+    setIsPanMode(false);
+    setIsPanning(false);
+    panStartRef.current = null;
+    if (canvasViewportRef.current) {
+      canvasViewportRef.current.scrollLeft = 0;
+      canvasViewportRef.current.scrollTop = 0;
+    }
   }, [task]);
 
   const allChecked = checkedItems.every(Boolean);
@@ -184,6 +213,46 @@ export default function AnnotatorWorkspacePage() {
 
   const handleSubmit = () => {
     setShowSubmitConfirm(true);
+  };
+
+  const handleZoomIn = () => {
+    setZoomIndex((prev) => Math.min(ZOOM_STEPS.length - 1, prev + 1));
+  };
+
+  const handleZoomOut = () => {
+    setZoomIndex((prev) => Math.max(0, prev - 1));
+  };
+
+  const handlePanMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    if (!isPanMode || !canvasViewportRef.current) {
+      return;
+    }
+
+    const viewport = canvasViewportRef.current;
+    panStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      scrollLeft: viewport.scrollLeft,
+      scrollTop: viewport.scrollTop,
+    };
+    setIsPanning(true);
+  };
+
+  const handlePanMouseMove = (event: MouseEvent<HTMLDivElement>) => {
+    if (!isPanMode || !isPanning || !canvasViewportRef.current || !panStartRef.current) {
+      return;
+    }
+
+    const viewport = canvasViewportRef.current;
+    const deltaX = event.clientX - panStartRef.current.x;
+    const deltaY = event.clientY - panStartRef.current.y;
+    viewport.scrollLeft = panStartRef.current.scrollLeft - deltaX;
+    viewport.scrollTop = panStartRef.current.scrollTop - deltaY;
+  };
+
+  const stopPan = () => {
+    setIsPanning(false);
+    panStartRef.current = null;
   };
 
   const handleConfirmSubmit = () => {
@@ -284,35 +353,74 @@ export default function AnnotatorWorkspacePage() {
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-700">Canvas</p>
             <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
-              <button className="rounded-md border border-gray-200 px-2 py-1">
+              <button
+                type="button"
+                onClick={handleZoomOut}
+                disabled={zoomIndex === 0}
+                className="rounded-md border border-gray-200 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+              >
                 Zoom -
               </button>
-              <button className="rounded-md border border-gray-200 px-2 py-1">
+              <span className="min-w-[44px] text-center">
+                {Math.round(ZOOM_STEPS[zoomIndex].value * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                disabled={zoomIndex === ZOOM_STEPS.length - 1}
+                className="rounded-md border border-gray-200 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+              >
                 Zoom +
               </button>
-              <button className="rounded-md border border-gray-200 px-2 py-1">
+              <button
+                type="button"
+                onClick={() => setIsPanMode((prev) => !prev)}
+                className={`rounded-md border px-2 py-1 ${
+                  isPanMode
+                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                    : "border-gray-200"
+                }`}
+              >
                 Pan
               </button>
-              <button className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-blue-700">
+              <button type="button" className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-blue-700">
                 Draw box
               </button>
             </div>
           </div>
           {task.uploadedImages && task.uploadedImages.length > 0 ? (
             <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3">
-              <div className="flex h-[320px] items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-white">
-                <img
-                  src={task.uploadedImages[activeImageIndex].dataUrl}
-                  alt={task.uploadedImages[activeImageIndex].name}
-                  className="max-h-full w-auto object-contain"
-                />
+              <div
+                ref={canvasViewportRef}
+                onMouseDown={handlePanMouseDown}
+                onMouseMove={handlePanMouseMove}
+                onMouseUp={stopPan}
+                onMouseLeave={stopPan}
+                className={`h-[320px] overflow-auto rounded-md border border-gray-200 bg-white ${
+                  isPanMode ? (isPanning ? "cursor-grabbing" : "cursor-grab") : "cursor-default"
+                }`}
+              >
+                <div className="flex min-h-full min-w-full items-center justify-center p-3">
+                  <img
+                    src={task.uploadedImages[activeImageIndex].dataUrl}
+                    alt={task.uploadedImages[activeImageIndex].name}
+                    draggable={false}
+                    className={`h-auto max-w-none object-contain transition-all duration-150 ${ZOOM_STEPS[zoomIndex].imageClass}`}
+                  />
+                </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {task.uploadedImages.map((image, index) => (
                   <button
                     key={image.name + index}
                     type="button"
-                    onClick={() => setActiveImageIndex(index)}
+                    onClick={() => {
+                      setActiveImageIndex(index);
+                      if (canvasViewportRef.current) {
+                        canvasViewportRef.current.scrollLeft = 0;
+                        canvasViewportRef.current.scrollTop = 0;
+                      }
+                    }}
                     className={`rounded-md border px-2 py-1 text-xs ${
                       index === activeImageIndex
                         ? "border-blue-500 bg-blue-50 text-blue-700"
