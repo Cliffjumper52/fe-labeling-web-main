@@ -1,4 +1,4 @@
-import React, { type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Outlet } from "react-router-dom";
 import SimpleHeader from "../header/simple-header";
 import SimpleFooter from "../footer/simple-footer";

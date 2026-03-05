@@ -1,7 +1,14 @@
 import ManagerLabelsPage from "../manager-labels/page";
 
 export default function AdminLabelsPage() {
-  const sampleLabels = [
+  const sampleLabels: {
+    id: string;
+    name: string;
+    description: string;
+    type: "Bounding Box" | "Polygon" | "Classification";
+    totalClasses: number;
+    createdAt: string;
+  }[] = [
     {
       id: "label-1",
       name: "Vehicle Detection",

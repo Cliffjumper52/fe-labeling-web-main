@@ -110,10 +110,16 @@ export const router: RouterItem[] = [
       () => import("../components/common/layout/simple-layout"),
     ),
     path: "/reviewer",
-    Component: React.lazy(() => import("../pages/reviewer-home/page")),
+    Component: React.lazy(() => import("../pages/reviewer-queue/page")),
     sidebar: React.lazy(
       () => import("../components/common/sidebar/reviewer-sidebar"),
     ),
+    children: [
+      {
+        path: "reports",
+        Component: React.lazy(() => import("../pages/reviewer-reports/page")),
+      },
+    ],
   },
   { path: "*", Component: React.lazy(() => import("../pages/not-found/page")) },
 ];

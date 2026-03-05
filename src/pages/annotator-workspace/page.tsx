@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Link, useParams } from "react-router-dom";
+import { toast } from "sonner";
+import { loadImagesFromStore, type StoredImageRef } from "../../utils/image-store";
 
 const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
+const ANNOTATOR_TASKS_UPDATED_EVENT = "annotator-tasks-updated";
 
 type UploadedImage = {
   name: string;
@@ -18,7 +21,9 @@ type WorkspaceTask = {
   instructions: string[];
   checklist: string[];
   labels: string[];
+  status?: "In Progress" | "Pending Review" | "Returned" | "Completed";
   uploadedImages?: UploadedImage[];
+  uploadedImageRefs?: StoredImageRef[];
 };
 
 const readAssignedWorkspaceTask = (taskId?: string): WorkspaceTask | null => {
@@ -41,6 +46,12 @@ const readAssignedWorkspaceTask = (taskId?: string): WorkspaceTask | null => {
     const uploadedImages = Array.isArray(matched.uploadedImages)
       ? (matched.uploadedImages as UploadedImage[]).filter(
           (item) => typeof item?.name === "string" && typeof item?.dataUrl === "string",
+        )
+      : [];
+
+    const uploadedImageRefs = Array.isArray(matched.uploadedImageRefs)
+      ? (matched.uploadedImageRefs as StoredImageRef[]).filter(
+          (item) => typeof item?.id === "string" && typeof item?.name === "string",
         )
       : [];
 
@@ -71,7 +82,15 @@ const readAssignedWorkspaceTask = (taskId?: string): WorkspaceTask | null => {
       instructions,
       checklist,
       labels,
+      status:
+        matched.status === "In Progress" ||
+        matched.status === "Pending Review" ||
+        matched.status === "Returned" ||
+        matched.status === "Completed"
+          ? (matched.status as WorkspaceTask["status"])
+          : "In Progress",
       uploadedImages,
+      uploadedImageRefs,
     };
   } catch {
     return null;
@@ -168,6 +187,9 @@ export default function AnnotatorWorkspacePage() {
   const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
   const [isPanMode, setIsPanMode] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const [resolvedUploadedImages, setResolvedUploadedImages] = useState<UploadedImage[]>(
+    task.uploadedImages ?? [],
+  );
   const canvasViewportRef = useRef<HTMLDivElement | null>(null);
   const panStartRef = useRef<{
     x: number;
@@ -180,18 +202,44 @@ export default function AnnotatorWorkspacePage() {
     setCheckedItems(task.checklist.map(() => false));
     setCustomLabels(task.labels);
     setNewLabel("");
-    setIsSubmitted(false);
+    setIsSubmitted(task.status === "Pending Review" || task.status === "Completed");
     setShowSubmitConfirm(false);
     setAiApplied(task.aiPrelabel === "Ready");
     setActiveImageIndex(0);
     setZoomIndex(DEFAULT_ZOOM_INDEX);
     setIsPanMode(false);
     setIsPanning(false);
+    setResolvedUploadedImages(task.uploadedImages ?? []);
     panStartRef.current = null;
     if (canvasViewportRef.current) {
       canvasViewportRef.current.scrollLeft = 0;
       canvasViewportRef.current.scrollTop = 0;
     }
+  }, [task]);
+
+  useEffect(() => {
+    let canceled = false;
+
+    const resolveImages = async () => {
+      if (!task.uploadedImageRefs || task.uploadedImageRefs.length === 0) {
+        return;
+      }
+
+      try {
+        const loaded = await loadImagesFromStore(task.uploadedImageRefs);
+        if (!canceled && loaded.length > 0) {
+          setResolvedUploadedImages(loaded);
+        }
+      } catch {
+        // Keep lightweight images from task payload.
+      }
+    };
+
+    void resolveImages();
+
+    return () => {
+      canceled = true;
+    };
   }, [task]);
 
   const allChecked = checkedItems.every(Boolean);
@@ -256,8 +304,74 @@ export default function AnnotatorWorkspacePage() {
   };
 
   const handleConfirmSubmit = () => {
-    setIsSubmitted(true);
-    setShowSubmitConfirm(false);
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const raw = localStorage.getItem(ANNOTATOR_TASKS_STORAGE_KEY);
+    if (!raw) {
+      toast.error("Task storage not found. Please re-assign the project first.");
+      return;
+    }
+
+    try {
+      const tasks = JSON.parse(raw) as Array<Record<string, unknown>>;
+      if (!Array.isArray(tasks)) {
+        toast.error("Task data is invalid.");
+        return;
+      }
+
+      let found = false;
+      const next = tasks.map((item) => {
+        if (String(item.id) !== String(task.id)) {
+          return item;
+        }
+
+        found = true;
+
+        return {
+          ...item,
+          status: "Pending Review",
+          progress: 100,
+          labels: customLabels,
+          submittedLabels: customLabels,
+          submittedImages: resolvedUploadedImages,
+          submittedImageRefs: task.uploadedImageRefs ?? [],
+          submittedAt: new Date().toISOString(),
+          reviewerNote: item.reviewerNote ?? "",
+        };
+      });
+
+      if (!found) {
+        next.unshift({
+          id: task.id,
+          projectName: task.projectName,
+          dataset: task.dataset,
+          priority: "Normal",
+          status: "Pending Review",
+          assignedAt: new Date().toISOString().slice(0, 10),
+          dueAt: new Date().toISOString().slice(0, 10),
+          aiPrelabel: task.aiPrelabel,
+          preset: task.preset,
+          progress: 100,
+          instructions: task.instructions,
+          checklist: task.checklist,
+          labels: customLabels,
+          submittedLabels: customLabels,
+          submittedImages: resolvedUploadedImages,
+          submittedImageRefs: task.uploadedImageRefs ?? [],
+          submittedAt: new Date().toISOString(),
+        });
+      }
+
+      localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(next));
+      window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
+      setIsSubmitted(true);
+      setShowSubmitConfirm(false);
+      toast.success("Submitted to reviewer queue.");
+    } catch {
+      toast.error("Submit failed. Please try again.");
+    }
   };
 
   return (
@@ -388,7 +502,7 @@ export default function AnnotatorWorkspacePage() {
               </button>
             </div>
           </div>
-          {task.uploadedImages && task.uploadedImages.length > 0 ? (
+          {resolvedUploadedImages.length > 0 ? (
             <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3">
               <div
                 ref={canvasViewportRef}
@@ -402,15 +516,15 @@ export default function AnnotatorWorkspacePage() {
               >
                 <div className="flex min-h-full min-w-full items-center justify-center p-3">
                   <img
-                    src={task.uploadedImages[activeImageIndex].dataUrl}
-                    alt={task.uploadedImages[activeImageIndex].name}
+                    src={resolvedUploadedImages[activeImageIndex].dataUrl}
+                    alt={resolvedUploadedImages[activeImageIndex].name}
                     draggable={false}
                     className={`h-auto max-w-none object-contain transition-all duration-150 ${ZOOM_STEPS[zoomIndex].imageClass}`}
                   />
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                {task.uploadedImages.map((image, index) => (
+                {resolvedUploadedImages.map((image, index) => (
                   <button
                     key={image.name + index}
                     type="button"
