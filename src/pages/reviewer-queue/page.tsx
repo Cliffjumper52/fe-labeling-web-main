@@ -6,10 +6,8 @@ import {
   type SetStateAction,
 } from "react";
 import { createPortal } from "react-dom";
-import {
-  loadImagesFromStore,
-  type StoredImageRef,
-} from "../../utils/image-store";
+import { Link } from "react-router-dom";
+import { type StoredImageRef } from "../../utils/image-store";
 
 type TaskStatus = "In Progress" | "Pending Review" | "Returned" | "Completed";
 type Severity = "Low" | "Medium" | "High";
@@ -132,7 +130,7 @@ export default function ReviewerQueuePage() {
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "All">(
     "Pending Review",
   );
-  const [activeTask, setActiveTask] = useState<ReviewTask | null>(null);
+  const [activeTask] = useState<ReviewTask | null>(null);
   const [isInspectOpen, setIsInspectOpen] = useState(false);
   const [decision, setDecision] = useState<"Approved" | "Rejected">("Approved");
   const [severity, setSeverity] = useState<Severity>("Low");
@@ -196,45 +194,6 @@ export default function ReviewerQueuePage() {
         return next;
       });
     }, 180);
-  };
-
-  const handleOpenInspect = async (task: ReviewTask) => {
-    let resolvedTask = task;
-
-    try {
-      let uploadedImages = task.uploadedImages ?? [];
-      let submittedImages = task.submittedImages ?? [];
-
-      if (task.uploadedImageRefs && task.uploadedImageRefs.length > 0) {
-        const loaded = await loadImagesFromStore(task.uploadedImageRefs);
-        if (loaded.length > 0) {
-          uploadedImages = loaded;
-        }
-      }
-
-      if (task.submittedImageRefs && task.submittedImageRefs.length > 0) {
-        const loaded = await loadImagesFromStore(task.submittedImageRefs);
-        if (loaded.length > 0) {
-          submittedImages = loaded;
-        }
-      }
-
-      resolvedTask = {
-        ...task,
-        uploadedImages,
-        submittedImages,
-      };
-    } catch {
-      // Keep lightweight placeholders if IndexedDB is unavailable.
-    }
-
-    setActiveTask(resolvedTask);
-    setDecision(task.qaDecision ?? "Approved");
-    setSeverity(task.severity ?? "Low");
-    setErrorTypes(task.errorTypes ?? []);
-    setReviewComment(task.reviewerNote ?? "");
-    setActiveReviewImageIndex(0);
-    setIsInspectOpen(true);
   };
 
   const getReviewImages = (task: ReviewTask) => {
@@ -405,13 +364,12 @@ export default function ReviewerQueuePage() {
                   {task.assignedAnnotators?.join(", ") || "Unassigned"}
                 </p>
                 <div className="flex items-center gap-3 text-sm font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => handleOpenInspect(task)}
+                  <Link
+                    to={`/reviewer/workspace/${task.id}`}
                     className="text-blue-600 hover:text-blue-700"
                   >
                     Inspect
-                  </button>
+                  </Link>
                 </div>
               </div>
             ))}

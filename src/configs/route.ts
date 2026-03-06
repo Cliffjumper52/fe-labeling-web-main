@@ -114,6 +114,10 @@ export const router: RouterItem[] = [
     ),
     children: [
       {
+        path: "workspace/:id",
+        Component: React.lazy(() => import("../pages/reviewer-workspace/page")),
+      },
+      {
         path: "reports",
         Component: React.lazy(() => import("../pages/reviewer-reports/page")),
       },
