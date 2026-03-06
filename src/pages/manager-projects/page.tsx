@@ -43,6 +43,8 @@ const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
 const ANNOTATOR_TASKS_UPDATED_EVENT = "annotator-tasks-updated";
 const ADMIN_USERS_STORAGE_KEY = "admin-users";
 const ADMIN_USERS_UPDATED_EVENT = "admin-users-updated";
+const MANAGER_PRESETS_STORAGE_KEY = "manager-presets";
+const MANAGER_PRESETS_UPDATED_EVENT = "manager-presets-updated";
 
 type AdminStorageUser = {
   id: string;
@@ -116,6 +118,24 @@ const readTeamMembersByRole = (
   }
 };
 
+const readManagerPresets = (): Preset[] => {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  const raw = localStorage.getItem(MANAGER_PRESETS_STORAGE_KEY);
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Preset[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
 type ManagerProjectsPageProps = {
   mode?: "manager" | "admin";
   initialProjects?: Project[];
@@ -138,22 +158,7 @@ export default function ManagerProjectsPage({
   );
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
-  const [presets] = useState<Preset[]>([
-    {
-      id: "preset-1",
-      name: "Retail SKU V2",
-      description: "Bounding boxes for shelf-facing SKUs.",
-      labels: ["Cereal", "Snack", "Soda"],
-      createdAt: "2026-02-10",
-    },
-    {
-      id: "preset-2",
-      name: "Vehicle Boxes",
-      description: "Cars, buses, bikes, and trucks.",
-      labels: ["Car", "Bus", "Bike", "Truck"],
-      createdAt: "2026-02-12",
-    },
-  ]);
+  const [presets, setPresets] = useState<Preset[]>(() => readManagerPresets());
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedUploadFiles, setSelectedUploadFiles] = useState<File[]>([]);
   const [uploadName, setUploadName] = useState("");
@@ -169,6 +174,7 @@ export default function ManagerProjectsPage({
   const [selectedAnnotators, setSelectedAnnotators] = useState<string[]>([]);
   const [selectedReviewers, setSelectedReviewers] = useState<string[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
+  const [presetSearch, setPresetSearch] = useState("");
   const [annotators, setAnnotators] = useState<TeamMember[]>(() =>
     readTeamMembersByRole("Annotator", fallbackAnnotators),
   );
@@ -387,6 +393,39 @@ export default function ManagerProjectsPage({
     };
   }, []);
 
+  useEffect(() => {
+    const refreshPresets = () => {
+      setPresets(readManagerPresets());
+    };
+
+    window.addEventListener("storage", refreshPresets);
+    window.addEventListener(MANAGER_PRESETS_UPDATED_EVENT, refreshPresets);
+
+    return () => {
+      window.removeEventListener("storage", refreshPresets);
+      window.removeEventListener(MANAGER_PRESETS_UPDATED_EVENT, refreshPresets);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedPreset) {
+      return;
+    }
+
+    const nextSelected = presets.find((item) => item.id === selectedPreset.id) ?? null;
+    if (!nextSelected) {
+      setSelectedPreset(null);
+      return;
+    }
+    if (
+      nextSelected.name !== selectedPreset.name ||
+      nextSelected.description !== selectedPreset.description ||
+      nextSelected.labels.join("||") !== selectedPreset.labels.join("||")
+    ) {
+      setSelectedPreset(nextSelected);
+    }
+  }, [presets, selectedPreset]);
+
   return (
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-3 flex items-center justify-between">
@@ -428,7 +467,10 @@ export default function ManagerProjectsPage({
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Status</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <select
+            title="Filter project status"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>All</option>
             <option>Active</option>
             <option>Archived</option>
@@ -437,7 +479,10 @@ export default function ManagerProjectsPage({
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Order by</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <select
+            title="Order projects by"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>Name</option>
             <option>Date created</option>
             <option>Updated</option>
@@ -446,7 +491,10 @@ export default function ManagerProjectsPage({
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Order</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <select
+            title="Project sort order"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>All</option>
             <option>Ascending</option>
             <option>Descending</option>
@@ -618,6 +666,7 @@ export default function ManagerProjectsPage({
                   onChange={(event) =>
                     setProjectDataType(event.target.value as Project["dataType"])
                   }
+                  title="Project data type"
                   className="rounded-md border border-gray-300 px-3 py-2 text-sm"
                 >
                   <option value="Image">Image</option>
@@ -904,6 +953,7 @@ export default function ManagerProjectsPage({
                             return;
                           }
                           if (section.id === "presets") {
+                            setPresetSearch("");
                             setIsSelectPresetOpen(true);
                           }
                         }}
@@ -1105,6 +1155,7 @@ export default function ManagerProjectsPage({
                 <input
                   ref={uploadInputRef}
                   type="file"
+                  title="Upload project files"
                   accept="image/*"
                   multiple
                   onChange={handleUploadFileChange}
@@ -1354,6 +1405,8 @@ export default function ManagerProjectsPage({
             </div>
             <div className="p-4">
               <input
+                value={presetSearch}
+                onChange={(event) => setPresetSearch(event.target.value)}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                 placeholder="Search presets"
               />
@@ -1366,10 +1419,24 @@ export default function ManagerProjectsPage({
                   </span>
                 </div>
                 <div className="mt-2 space-y-2 rounded-md border border-gray-300 p-3">
-                  {presets.length === 0 ? (
+                  {presets.filter((preset) => {
+                    const keyword = presetSearch.toLowerCase();
+                    return (
+                      preset.name.toLowerCase().includes(keyword) ||
+                      (preset.description ?? "").toLowerCase().includes(keyword)
+                    );
+                  }).length === 0 ? (
                     <span className="text-xs text-gray-400">No presets available</span>
                   ) : (
-                    presets.map((preset) => (
+                    presets
+                      .filter((preset) => {
+                        const keyword = presetSearch.toLowerCase();
+                        return (
+                          preset.name.toLowerCase().includes(keyword) ||
+                          (preset.description ?? "").toLowerCase().includes(keyword)
+                        );
+                      })
+                      .map((preset) => (
                       <button
                         key={preset.id}
                         type="button"
