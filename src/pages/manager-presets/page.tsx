@@ -62,7 +62,9 @@ export default function ManagerPresetsPage({
   const [presetName, setPresetName] = useState("");
   const [presetDescription, setPresetDescription] = useState("");
   const [presetLabelQuery, setPresetLabelQuery] = useState("");
-  const [selectedPresetLabels, setSelectedPresetLabels] = useState<string[]>([]);
+  const [selectedPresetLabels, setSelectedPresetLabels] = useState<string[]>(
+    [],
+  );
   const [isEditPresetOpen, setIsEditPresetOpen] = useState(false);
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
   const [editPresetName, setEditPresetName] = useState("");
@@ -91,7 +93,6 @@ export default function ManagerPresetsPage({
     setEditPresetLabelQuery("");
     setEditSelectedPresetLabels([]);
   };
-
   useEffect(() => {
     if (isAdmin || typeof window === "undefined") {
       return;
@@ -116,10 +117,7 @@ export default function ManagerPresetsPage({
       ...prev,
     ]);
     setIsCreatePresetOpen(false);
-    setPresetName("");
-    setPresetDescription("");
-    setPresetLabelQuery("");
-    setSelectedPresetLabels([]);
+    resetCreatePresetForm();
   };
 
   const handleAddPresetLabel = () => {
@@ -158,7 +156,9 @@ export default function ManagerPresetsPage({
   };
 
   const handleRemoveEditPresetLabel = (label: string) => {
-    setEditSelectedPresetLabels((prev) => prev.filter((item) => item !== label));
+    setEditSelectedPresetLabels((prev) =>
+      prev.filter((item) => item !== label),
+    );
   };
 
   const handleUpdatePreset = (event: FormEvent) => {
@@ -298,7 +298,9 @@ export default function ManagerPresetsPage({
               <path d="M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-gray-800">No Presets Yet</h3>
+          <h3 className="text-lg font-semibold text-gray-800">
+            No Presets Yet
+          </h3>
           <p className="mt-1 text-sm text-gray-500">
             {isAdmin
               ? "No presets are available right now."
@@ -400,7 +402,9 @@ export default function ManagerPresetsPage({
               </h3>
               <button
                 type="button"
-                onClick={() => closeWithAnimation("createPreset", setIsCreatePresetOpen)}
+                onClick={() =>
+                  closeWithAnimation("createPreset", setIsCreatePresetOpen)
+                }
                 className="text-gray-500 hover:text-gray-700"
                 aria-label="Close"
               >
@@ -417,9 +421,14 @@ export default function ManagerPresetsPage({
               </button>
             </div>
 
-            <form onSubmit={handleCreatePreset} className="flex flex-col gap-4 p-4">
+            <form
+              onSubmit={handleCreatePreset}
+              className="flex flex-col gap-4 p-4"
+            >
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">Preset name</label>
+                <label className="text-xs font-semibold text-gray-700">
+                  Preset name
+                </label>
                 <input
                   value={presetName}
                   onChange={(event) => setPresetName(event.target.value)}
@@ -442,11 +451,15 @@ export default function ManagerPresetsPage({
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-gray-700">Add labels</label>
+                <label className="text-xs font-semibold text-gray-700">
+                  Add labels
+                </label>
                 <div className="flex items-center gap-2">
                   <input
                     value={presetLabelQuery}
-                    onChange={(event) => setPresetLabelQuery(event.target.value)}
+                    onChange={(event) =>
+                      setPresetLabelQuery(event.target.value)
+                    }
                     className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
                     placeholder="Search labels to add..."
                   />
@@ -461,10 +474,14 @@ export default function ManagerPresetsPage({
               </div>
 
               <div className="rounded-md border border-gray-200 p-3">
-                <span className="text-xs font-semibold text-gray-700">Selected labels</span>
+                <span className="text-xs font-semibold text-gray-700">
+                  Selected labels
+                </span>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {selectedPresetLabels.length === 0 && (
-                    <span className="text-xs text-gray-400">No labels selected</span>
+                    <span className="text-xs text-gray-400">
+                      No labels selected
+                    </span>
                   )}
                   {selectedPresetLabels.map((label) => (
                     <span
@@ -629,10 +646,14 @@ export default function ManagerPresetsPage({
             }`}
           >
             <div className="flex items-center justify-between border-b px-4 py-3">
-              <h3 className="text-sm font-semibold text-gray-800">Preset details</h3>
+              <h3 className="text-sm font-semibold text-gray-800">
+                Preset details
+              </h3>
               <button
                 type="button"
-                onClick={() => closeWithAnimation("presetDetails", setIsDetailOpen)}
+                onClick={() =>
+                  closeWithAnimation("presetDetails", setIsDetailOpen)
+                }
                 className="text-gray-500 hover:text-gray-700"
                 aria-label="Close"
               >
@@ -657,7 +678,9 @@ export default function ManagerPresetsPage({
               </div>
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-md border border-gray-200 p-3">
-                  <p className="text-xs font-semibold text-gray-700">Date created</p>
+                  <p className="text-xs font-semibold text-gray-700">
+                    Date created
+                  </p>
                   <p className="mt-2 text-sm text-gray-800">
                     {detailPreset.createdAt}
                   </p>

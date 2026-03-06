@@ -1,7 +1,14 @@
 import ManagerProjectsPage from "../manager-projects/page";
 
 export default function AdminProjectsPage() {
-  const sampleProjects = [
+  const sampleProjects: {
+    id: string;
+    name: string;
+    description: string;
+    status: "Active" | "Drafting" | "Archived";
+    dataType: "Image" | "Video" | "Text" | "Audio";
+    createdAt: string;
+  }[] = [
     {
       id: "proj-1",
       name: "Retail Shelf Audit",
