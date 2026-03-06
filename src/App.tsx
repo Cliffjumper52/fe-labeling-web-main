@@ -1,11 +1,33 @@
-import React from "react";
+import React, { useEffect } from "react";
 import "./App.css";
 import { router } from "./configs/route";
 import { Routes, Route } from "react-router-dom";
 import Loading from "./components/common/loading/loading";
 import { Toaster } from "sonner";
+import { migrateLegacyTaskImagesToIndexedDb } from "./utils/image-store";
 
 function App() {
+  useEffect(() => {
+    let canceled = false;
+
+    const runMigration = async () => {
+      try {
+        const result = await migrateLegacyTaskImagesToIndexedDb();
+        if (!canceled && result.migrated) {
+          window.dispatchEvent(new CustomEvent("annotator-tasks-updated"));
+        }
+      } catch {
+        // Keep app running even if migration fails in restricted browser mode.
+      }
+    };
+
+    void runMigration();
+
+    return () => {
+      canceled = true;
+    };
+  }, []);
+
   return (
     <>
       <Toaster />

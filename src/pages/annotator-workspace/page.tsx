@@ -1,26 +1,75 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import {
+  loadImagesFromStore,
+  type StoredImageRef,
+} from "../../utils/image-store";
 
 const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
-const ANNOTATOR_TASKS_UPDATED_EVENT = "annotator-tasks-updated";
 
 type UploadedImage = {
   name: string;
   dataUrl: string;
 };
 
+type ReviewedChecklistItem = {
+  item: string;
+  passed: boolean;
+  note?: string;
+};
+
+type SubmittedChecklistItem = {
+  item: string;
+  checked: boolean;
+};
+
+type ReviewErrorItem = {
+  reviewErrorTypeName: string;
+  type: string;
+  severity: "Low" | "Medium" | "High";
+  location: string;
+  description: string;
+};
+
+type SubmittedVersion = {
+  id: string;
+  title: string;
+  answerBy: string;
+  submittedAt: string;
+  checklist: SubmittedChecklistItem[];
+};
+
+type ReviewVersion = {
+  id: string;
+  title: string;
+  reviewer: string;
+  reviewedAt: string;
+  decision: "Approved" | "Returned" | "Rejected";
+  feedbacks: string;
+  checklist: ReviewedChecklistItem[];
+  reviewErrors: ReviewErrorItem[];
+};
+
+type LabelRound = {
+  id: string;
+  title: string;
+  submittedVersion: SubmittedVersion | null;
+  reviewVersion: ReviewVersion | null;
+};
+
 type WorkspaceTask = {
   id: string;
   projectName: string;
   dataset: string;
-  status?: "In Progress" | "Pending Review" | "Returned" | "Completed";
   itemName: string;
   preset: string;
   aiPrelabel: "Ready" | "Running" | "Off";
   instructions: string[];
   checklist: string[];
   labels: string[];
+  status?: "In Progress" | "Pending Review" | "Returned" | "Completed";
   uploadedImages?: UploadedImage[];
+  uploadedImageRefs?: StoredImageRef[];
 };
 
 const readAssignedWorkspaceTask = (taskId?: string): WorkspaceTask | null => {
@@ -42,7 +91,15 @@ const readAssignedWorkspaceTask = (taskId?: string): WorkspaceTask | null => {
 
     const uploadedImages = Array.isArray(matched.uploadedImages)
       ? (matched.uploadedImages as UploadedImage[]).filter(
-          (item) => typeof item?.name === "string" && typeof item?.dataUrl === "string",
+          (item) =>
+            typeof item?.name === "string" && typeof item?.dataUrl === "string",
+        )
+      : [];
+
+    const uploadedImageRefs = Array.isArray(matched.uploadedImageRefs)
+      ? (matched.uploadedImageRefs as StoredImageRef[]).filter(
+          (item) =>
+            typeof item?.id === "string" && typeof item?.name === "string",
         )
       : [];
 
@@ -51,11 +108,15 @@ const readAssignedWorkspaceTask = (taskId?: string): WorkspaceTask | null => {
       : ["Label A", "Label B"];
 
     const instructions = Array.isArray(matched.instructions)
-      ? (matched.instructions as string[]).filter((item) => typeof item === "string")
+      ? (matched.instructions as string[]).filter(
+          (item) => typeof item === "string",
+        )
       : ["Follow manager instructions before labeling."];
 
     const checklist = Array.isArray(matched.checklist)
-      ? (matched.checklist as string[]).filter((item) => typeof item === "string")
+      ? (matched.checklist as string[]).filter(
+          (item) => typeof item === "string",
+        )
       : ["Checklist completed"];
 
     return {
@@ -81,6 +142,7 @@ const readAssignedWorkspaceTask = (taskId?: string): WorkspaceTask | null => {
       checklist,
       labels,
       uploadedImages,
+      uploadedImageRefs,
     };
   } catch {
     return null;
@@ -153,6 +215,128 @@ const fallbackTask: WorkspaceTask = {
   labels: ["Label A", "Label B"],
 };
 
+const buildChecklistForLabel = (
+  label: string,
+  checklist: string[],
+): string[] => {
+  const normalizedChecklist =
+    checklist.length > 0 ? checklist : ["Checklist completed"];
+
+  return normalizedChecklist.map((item) => `${item} (${label})`);
+};
+
+const buildLabelRounds = (label: string, checklist: string[]): LabelRound[] => {
+  const labelChecklist = buildChecklistForLabel(label, checklist);
+
+  const submittedV1: SubmittedVersion = {
+    id: "submitted-v1",
+    title: "Submitted v1",
+    answerBy: "Annotator",
+    submittedAt: "2026-03-05 09:12",
+    checklist: labelChecklist.map((item, index) => ({
+      item,
+      checked: index !== labelChecklist.length - 1,
+    })),
+  };
+
+  const submittedV2: SubmittedVersion = {
+    id: "submitted-v2",
+    title: "Submitted v2",
+    answerBy: "Annotator",
+    submittedAt: "2026-03-05 16:48",
+    checklist: labelChecklist.map((item) => ({
+      item,
+      checked: true,
+    })),
+  };
+
+  const reviewV1: ReviewVersion = {
+    id: "review-v1",
+    title: "Review v1",
+    reviewer: "Reviewer",
+    reviewedAt: "2026-03-05 11:02",
+    decision: "Returned",
+    feedbacks: `Please re-check ${label} consistency before final approval.`,
+    checklist: labelChecklist.map((item, index) => ({
+      item,
+      passed: index % 2 === 0,
+      note: index % 2 === 0 ? "Accepted" : "Need correction",
+    })),
+    reviewErrors: [
+      {
+        reviewErrorTypeName: "Label mismatch",
+        type: "Classification",
+        severity: "Medium",
+        location: `Label ${label}`,
+        description: `Submitted class differs from reviewer expectation for ${label}.`,
+      },
+      {
+        reviewErrorTypeName: "Missing evidence",
+        type: "Checklist",
+        severity: "Low",
+        location: "Checklist item 2",
+        description: "Supporting rationale is incomplete for one checked item.",
+      },
+    ],
+  };
+
+  const reviewV2: ReviewVersion = {
+    id: "review-v2",
+    title: "Review v2",
+    reviewer: "Reviewer",
+    reviewedAt: "2026-03-05 18:10",
+    decision: "Approved",
+    feedbacks: `Updated submission for ${label} is acceptable.`,
+    checklist: labelChecklist.map((item) => ({
+      item,
+      passed: true,
+      note: "Accepted",
+    })),
+    reviewErrors: [
+      {
+        reviewErrorTypeName: "Boundary issue",
+        type: "Localization",
+        severity: "Low",
+        location: `Label ${label}`,
+        description: `Small boundary adjustment was suggested and then resolved for ${label}.`,
+      },
+    ],
+  };
+
+  return [
+    {
+      id: "round-1",
+      title: "Round 1",
+      submittedVersion: submittedV1,
+      reviewVersion: reviewV1,
+    },
+    {
+      id: "round-2",
+      title: "Round 2",
+      submittedVersion: {
+        ...submittedV2,
+        id: "submitted-v3",
+        title: "Submitted v3",
+        submittedAt: "2026-03-06 08:15",
+      },
+      reviewVersion: {
+        ...reviewV2,
+        id: "review-v3",
+        title: "Review v3",
+        reviewedAt: "2026-03-06 10:01",
+        decision: "Approved",
+        feedbacks: `Final review completed for ${label}.`,
+      },
+    },
+    {
+      id: "round-3",
+      title: "Round 3",
+      submittedVersion: null,
+      reviewVersion: null,
+    },
+  ];
+};
+
 export default function AnnotatorWorkspacePage() {
   const { id } = useParams();
   const storageTask = useMemo(() => readAssignedWorkspaceTask(id), [id]);
@@ -160,82 +344,181 @@ export default function AnnotatorWorkspacePage() {
     () => storageTask ?? taskMap[id ?? ""] ?? fallbackTask,
     [id, storageTask],
   );
-  const [checkedItems, setCheckedItems] = useState<boolean[]>([]);
   const [customLabels, setCustomLabels] = useState<string[]>(task.labels);
-  const [newLabel, setNewLabel] = useState("");
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [aiApplied, setAiApplied] = useState(task.aiPrelabel === "Ready");
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [labelSearch, setLabelSearch] = useState("");
+  const [selectedLabel, setSelectedLabel] = useState<string | null>(
+    task.labels[0] ?? null,
+  );
+  const [activeRoundId, setActiveRoundId] = useState("round-1");
+  const [showReviewErrors, setShowReviewErrors] = useState(false);
+  const [round3SubmittedByLabel, setRound3SubmittedByLabel] = useState<
+    Record<string, SubmittedVersion>
+  >({});
+  const [round3DraftChecklistByLabel, setRound3DraftChecklistByLabel] =
+    useState<Record<string, SubmittedChecklistItem[]>>({});
+  const [resolvedUploadedImages, setResolvedUploadedImages] = useState<
+    UploadedImage[]
+  >(task.uploadedImages ?? []);
+  const isSubmitted =
+    task.status === "Pending Review" || task.status === "Completed";
+
+  const filteredLabels = useMemo(() => {
+    const keyword = labelSearch.trim().toLowerCase();
+    if (!keyword) {
+      return customLabels;
+    }
+
+    return customLabels.filter((label) =>
+      label.toLowerCase().includes(keyword),
+    );
+  }, [customLabels, labelSearch]);
+
+  const labelRounds = useMemo(() => {
+    const entries = customLabels.map((label) => [
+      label,
+      buildLabelRounds(label, task.checklist),
+    ]);
+    return Object.fromEntries(entries) as Record<string, LabelRound[]>;
+  }, [customLabels, task.checklist]);
+
+  const selectedLabelRounds =
+    selectedLabel && labelRounds[selectedLabel]
+      ? labelRounds[selectedLabel]
+      : [];
+
+  const activeRound =
+    selectedLabelRounds.find((round) => round.id === activeRoundId) ??
+    selectedLabelRounds[0] ??
+    null;
+
+  const activeSubmittedVersion =
+    activeRound?.id === "round-3" && selectedLabel
+      ? (round3SubmittedByLabel[selectedLabel] ?? null)
+      : (activeRound?.submittedVersion ?? null);
+
+  const round3DraftChecklist = selectedLabel
+    ? (round3DraftChecklistByLabel[selectedLabel] ?? [])
+    : [];
+
+  const activeReviewVersion = activeRound?.reviewVersion ?? null;
 
   useEffect(() => {
-    setCheckedItems(task.checklist.map(() => false));
     setCustomLabels(task.labels);
-    setNewLabel("");
-    setIsSubmitted(task.status === "Pending Review" || task.status === "Completed");
-    setShowSubmitConfirm(false);
     setAiApplied(task.aiPrelabel === "Ready");
     setActiveImageIndex(0);
+    setLabelSearch("");
+    setSelectedLabel(task.labels[0] ?? null);
+    setActiveRoundId("round-1");
+    setShowReviewErrors(false);
+    setRound3SubmittedByLabel({});
+    setRound3DraftChecklistByLabel({});
+    setResolvedUploadedImages(task.uploadedImages ?? []);
   }, [task]);
 
-  const allChecked = checkedItems.every(Boolean);
+  useEffect(() => {
+    if (!selectedLabel || !customLabels.includes(selectedLabel)) {
+      setSelectedLabel(customLabels[0] ?? null);
+      setActiveRoundId("round-1");
+      setShowReviewErrors(false);
+    }
+  }, [customLabels, selectedLabel]);
 
-  const handleToggleChecklist = (index: number) => {
-    setCheckedItems((prev) =>
-      prev.map((checked, idx) => (idx === index ? !checked : checked)),
-    );
-  };
+  useEffect(() => {
+    let canceled = false;
 
-  const handleAddLabel = () => {
-    const trimmed = newLabel.trim();
-    if (!trimmed || customLabels.includes(trimmed)) {
+    const resolveImages = async () => {
+      if (!task.uploadedImageRefs || task.uploadedImageRefs.length === 0) {
+        return;
+      }
+
+      try {
+        const loaded = await loadImagesFromStore(task.uploadedImageRefs);
+        if (!canceled && loaded.length > 0) {
+          setResolvedUploadedImages(loaded);
+        }
+      } catch {
+        // Keep lightweight images from task payload.
+      }
+    };
+
+    void resolveImages();
+
+    return () => {
+      canceled = true;
+    };
+  }, [task]);
+
+  useEffect(() => {
+    if (activeRound?.id !== "round-3" || !selectedLabel) {
       return;
     }
-    setCustomLabels((prev) => [...prev, trimmed]);
-    setNewLabel("");
-  };
 
-  const handleSubmit = () => {
-    setShowSubmitConfirm(true);
-  };
-
-  const handleConfirmSubmit = () => {
-    if (typeof window !== "undefined") {
-      const raw = localStorage.getItem(ANNOTATOR_TASKS_STORAGE_KEY);
-
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
-          const submittedAt = new Date().toISOString().slice(0, 10);
-
-          const updated = parsed.map((item) => {
-            if (String(item.id) !== task.id) {
-              return item;
-            }
-
-            return {
-              ...item,
-              status: "Pending Review",
-              progress: 100,
-              submittedAt,
-              submittedImages: task.uploadedImages ?? [],
-              qaDecision: undefined,
-              qaReviewedAt: undefined,
-              errorTypes: [],
-              reviewerNote: "",
-            };
-          });
-
-          localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(updated));
-          window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
-        } catch {
-          // ignore malformed local data and keep UI submission state
-        }
-      }
+    if (round3SubmittedByLabel[selectedLabel]) {
+      return;
     }
 
-    setIsSubmitted(true);
-    setShowSubmitConfirm(false);
+    setRound3DraftChecklistByLabel((prev) => {
+      if (prev[selectedLabel]) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [selectedLabel]: buildChecklistForLabel(
+          selectedLabel,
+          task.checklist,
+        ).map((item) => ({
+          item,
+          checked: false,
+        })),
+      };
+    });
+  }, [activeRound?.id, round3SubmittedByLabel, selectedLabel, task.checklist]);
+
+  const handleToggleRound3DraftChecklist = (index: number) => {
+    if (!selectedLabel) {
+      return;
+    }
+
+    setRound3DraftChecklistByLabel((prev) => {
+      const current = prev[selectedLabel] ?? [];
+      if (!current[index]) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [selectedLabel]: current.map((item, idx) =>
+          idx === index ? { ...item, checked: !item.checked } : item,
+        ),
+      };
+    });
+  };
+
+  const handleRound3Submit = () => {
+    if (!selectedLabel || activeRound?.id !== "round-3") {
+      return;
+    }
+
+    const checklist =
+      round3DraftChecklistByLabel[selectedLabel] ??
+      buildChecklistForLabel(selectedLabel, task.checklist).map((item) => ({
+        item,
+        checked: false,
+      }));
+
+    setRound3SubmittedByLabel((prev) => ({
+      ...prev,
+      [selectedLabel]: {
+        id: `round-3-submitted-${Date.now()}`,
+        title: "Submitted v1",
+        answerBy: "Annotator",
+        submittedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
+        checklist,
+      },
+    }));
   };
 
   return (
@@ -329,33 +612,27 @@ export default function AnnotatorWorkspacePage() {
 
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-700">Canvas</p>
-            <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
-              <button className="rounded-md border border-gray-200 px-2 py-1">
-                Zoom -
-              </button>
-              <button className="rounded-md border border-gray-200 px-2 py-1">
-                Zoom +
-              </button>
-              <button className="rounded-md border border-gray-200 px-2 py-1">
-                Pan
-              </button>
-              <button className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-blue-700">
-                Draw box
-              </button>
-            </div>
+            <p className="text-sm font-semibold text-gray-700">
+              Canvas Preview
+            </p>
+            <span className="rounded-md bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-500">
+              Read-only
+            </span>
           </div>
-          {task.uploadedImages && task.uploadedImages.length > 0 ? (
+          {resolvedUploadedImages.length > 0 ? (
             <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3">
-              <div className="flex h-[320px] items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-white">
-                <img
-                  src={task.uploadedImages[activeImageIndex].dataUrl}
-                  alt={task.uploadedImages[activeImageIndex].name}
-                  className="max-h-full w-auto object-contain"
-                />
+              <div className="h-[360px] overflow-hidden rounded-md border border-gray-200 bg-white">
+                <div className="flex h-full items-center justify-center p-3">
+                  <img
+                    src={resolvedUploadedImages[activeImageIndex].dataUrl}
+                    alt={resolvedUploadedImages[activeImageIndex].name}
+                    draggable={false}
+                    className="h-auto max-h-full w-auto max-w-full object-contain"
+                  />
+                </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                {task.uploadedImages.map((image, index) => (
+                {resolvedUploadedImages.map((image, index) => (
                   <button
                     key={image.name + index}
                     type="button"
@@ -388,120 +665,294 @@ export default function AnnotatorWorkspacePage() {
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 lg:max-h-[calc(100vh-150px)] lg:overflow-y-auto lg:pr-1">
           <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold text-gray-500">Checklist</p>
-            <div className="mt-3 space-y-2 text-sm text-gray-700">
-              {task.checklist.map((item, index) => (
-                <label
-                  key={item}
-                  className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
-                >
-                  <input
-                    type="checkbox"
-                    checked={checkedItems[index] ?? false}
-                    onChange={() => handleToggleChecklist(index)}
-                  />
-                  <span>{item}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold text-gray-500">Labels</p>
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <input
-                  value={newLabel}
-                  onChange={(event) => setNewLabel(event.target.value)}
-                  className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="Add new label..."
-                />
-                <button
-                  type="button"
-                  onClick={handleAddLabel}
-                  className="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white"
-                >
-                  Add
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {customLabels.map((label) => (
-                  <span
+            <p className="text-xs font-semibold text-gray-500">Search label</p>
+            <input
+              value={labelSearch}
+              onChange={(event) => setLabelSearch(event.target.value)}
+              className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              placeholder="Search labels..."
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              {filteredLabels.length > 0 ? (
+                filteredLabels.map((label) => (
+                  <button
                     key={label}
-                    className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
+                    type="button"
+                    onClick={() => {
+                      const nextLabelRounds = labelRounds[label] ?? [];
+                      const keepCurrentRound = nextLabelRounds.some(
+                        (round) => round.id === activeRoundId,
+                      );
+                      setSelectedLabel(label);
+                      if (!keepCurrentRound) {
+                        setActiveRoundId(nextLabelRounds[0]?.id ?? "round-1");
+                      }
+                      setShowReviewErrors(false);
+                    }}
+                    className={`rounded-md border px-2 py-1 text-xs ${
+                      selectedLabel === label
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-gray-200 bg-white text-gray-700"
+                    }`}
                   >
                     {label}
-                  </span>
-                ))}
-              </div>
+                  </button>
+                ))
+              ) : (
+                <p className="text-xs text-gray-500">No labels matched.</p>
+              )}
+            </div>
+            <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                Selected label
+              </p>
+              <p className="mt-1 text-sm font-semibold text-gray-800">
+                {selectedLabel ?? "No label selected"}
+              </p>
             </div>
           </div>
 
           <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold text-gray-500">Submit</p>
-            <p className="mt-2 text-sm text-gray-600">
-              Complete the checklist before submitting for review.
-            </p>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!allChecked || isSubmitted}
-              className={`mt-3 w-full rounded-md px-3 py-2 text-sm font-semibold text-white ${
-                !allChecked || isSubmitted
-                  ? "bg-gray-300"
-                  : "bg-blue-600 hover:bg-blue-700"
-              }`}
-            >
-              {isSubmitted ? "Submitted" : "Submit for review"}
-            </button>
-            {!allChecked && (
-              <p className="mt-2 text-xs text-amber-600">
-                Please confirm all checklist items.
+            <p className="text-xs font-semibold text-gray-500">Rounds</p>
+            {selectedLabel && selectedLabelRounds.length > 0 ? (
+              <div className="mt-3 space-y-3">
+                <div className="flex gap-2">
+                  {selectedLabelRounds.map((round) => (
+                    <button
+                      key={round.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveRoundId(round.id);
+                        setShowReviewErrors(false);
+                      }}
+                      className={`rounded-md border px-3 py-1 text-xs font-semibold ${
+                        activeRound?.id === round.id
+                          ? "border-blue-500 bg-blue-50 text-blue-700"
+                          : "border-gray-200 text-gray-600"
+                      }`}
+                    >
+                      {round.title}
+                    </button>
+                  ))}
+                </div>
+
+                {activeRound && (
+                  <div className="space-y-3">
+                    <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-3">
+                      <p className="text-xs font-semibold text-gray-700">
+                        Submitted version
+                      </p>
+                      {activeSubmittedVersion && (
+                        <>
+                          <p className="mt-2 text-[11px] text-gray-500">
+                            {activeSubmittedVersion.answerBy} •{" "}
+                            {activeSubmittedVersion.submittedAt}
+                          </p>
+                          <div className="mt-2 space-y-2 text-sm text-gray-700">
+                            {activeSubmittedVersion.checklist.map((item) => (
+                              <label
+                                key={item.item}
+                                className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={item.checked}
+                                  readOnly
+                                />
+                                <span>{item.item}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {!activeSubmittedVersion && (
+                        <div className="mt-2 space-y-2">
+                          <p className="text-sm text-gray-500">
+                            No submitted version in this round.
+                          </p>
+                          {activeRound?.id === "round-3" && (
+                            <div className="space-y-2">
+                              {round3DraftChecklist.length > 0 ? (
+                                round3DraftChecklist.map((item, index) => (
+                                  <label
+                                    key={item.item}
+                                    className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={item.checked}
+                                      onChange={() =>
+                                        handleToggleRound3DraftChecklist(index)
+                                      }
+                                    />
+                                    <span>{item.item}</span>
+                                  </label>
+                                ))
+                              ) : (
+                                <p className="text-sm text-gray-500">
+                                  Checklist is not available.
+                                </p>
+                              )}
+                              <button
+                                type="button"
+                                onClick={handleRound3Submit}
+                                className="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+                              >
+                                Submit round 3
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-md border border-gray-200 bg-white px-3 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-gray-700">
+                          Review version
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowReviewErrors(true)}
+                          className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={!activeReviewVersion}
+                        >
+                          Open review
+                        </button>
+                      </div>
+                      {activeReviewVersion && (
+                        <>
+                          <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-gray-500">
+                            <p>
+                              {activeReviewVersion.reviewer} •{" "}
+                              {activeReviewVersion.reviewedAt}
+                            </p>
+                            <span
+                              className={`rounded px-2 py-[2px] font-semibold ${
+                                activeReviewVersion.decision === "Approved"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : activeReviewVersion.decision === "Returned"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-red-100 text-red-700"
+                              }`}
+                            >
+                              {activeReviewVersion.decision}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-xs text-gray-600">
+                            {activeReviewVersion.feedbacks}
+                          </p>
+                          <div className="mt-2 space-y-2 text-sm text-gray-700">
+                            {activeReviewVersion.checklist.map((item) => (
+                              <label
+                                key={item.item}
+                                className="flex items-center gap-2 rounded-md border border-gray-100 bg-gray-50 px-3 py-2"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={item.passed}
+                                  readOnly
+                                />
+                                <span className="flex-1">{item.item}</span>
+                                <span
+                                  className={`rounded px-2 py-[2px] text-[11px] font-semibold ${
+                                    item.passed
+                                      ? "bg-emerald-100 text-emerald-700"
+                                      : "bg-amber-100 text-amber-700"
+                                  }`}
+                                >
+                                  {item.passed ? "Passed" : "Rework"}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {!activeReviewVersion && (
+                        <p className="mt-2 text-sm text-gray-500">
+                          No review version in this round.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-gray-500">
+                Select a label to view rounds and review history.
               </p>
             )}
           </div>
         </div>
       </div>
 
-      {showSubmitConfirm && (
+      {showReviewErrors && activeRound && activeReviewVersion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-          <div className="w-full max-w-md rounded-lg border border-gray-300 bg-white shadow-xl modal-pop">
+          <div className="w-full max-w-lg rounded-lg border border-gray-300 bg-white shadow-xl">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <h3 className="text-sm font-semibold text-gray-800">
-                Submit task
+                Review errors • {selectedLabel} • {activeRound.title} •{" "}
+                {activeReviewVersion.title}
               </h3>
               <button
                 type="button"
-                onClick={() => setShowSubmitConfirm(false)}
+                onClick={() => setShowReviewErrors(false)}
                 className="text-gray-500 hover:text-gray-700"
                 aria-label="Close"
               >
-                ✕
+                x
               </button>
             </div>
-            <div className="p-4 text-sm text-gray-700">
-              <p>
-                You are about to submit this task for review. Status will change
-                to Pending Review.
-              </p>
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowSubmitConfirm(false)}
-                  className="rounded-md border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmSubmit}
-                  className="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white"
-                >
-                  Confirm submit
-                </button>
+            <div className="max-h-[70vh] overflow-y-auto p-4">
+              <div className="mb-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                <p>
+                  Decision:{" "}
+                  <span className="font-semibold">
+                    {activeReviewVersion.decision}
+                  </span>
+                </p>
+                <p className="mt-1">{activeReviewVersion.feedbacks}</p>
               </div>
+              {activeReviewVersion.reviewErrors.length > 0 ? (
+                <div className="space-y-3">
+                  {activeReviewVersion.reviewErrors.map((error, index) => (
+                    <div
+                      key={`${error.reviewErrorTypeName}-${index}`}
+                      className="rounded-md border border-gray-200 bg-gray-50 p-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold text-gray-800">
+                          {error.reviewErrorTypeName}
+                        </p>
+                        <span
+                          className={`rounded px-2 py-[2px] text-[11px] font-semibold ${
+                            error.severity === "High"
+                              ? "bg-red-100 text-red-700"
+                              : error.severity === "Medium"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          {error.severity}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Type: {error.type}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Location: {error.location}
+                      </p>
+                      <p className="mt-2 text-sm text-gray-700">
+                        {error.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No review errors found.</p>
+              )}
             </div>
           </div>
         </div>

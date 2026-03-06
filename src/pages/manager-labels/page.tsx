@@ -1,4 +1,6 @@
 import {
+  useEffect,
+  useMemo,
   useState,
   type Dispatch,
   type FormEvent,
@@ -11,6 +13,7 @@ type Label = {
   description?: string;
   type: "Bounding Box" | "Polygon" | "Classification";
   totalClasses: number;
+  classes?: string[];
   createdAt: string;
 };
 
@@ -19,18 +22,58 @@ type ManagerLabelsPageProps = {
   initialLabels?: Label[];
 };
 
+const MANAGER_LABELS_STORAGE_KEY = "manager-label-sets";
+
+const readManagerLabels = (): Label[] => {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  const raw = localStorage.getItem(MANAGER_LABELS_STORAGE_KEY);
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Label[];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed;
+  } catch {
+    return [];
+  }
+};
+
 export default function ManagerLabelsPage({
   mode = "manager",
   initialLabels,
 }: ManagerLabelsPageProps) {
   const isAdmin = mode === "admin";
-  const [labels, setLabels] = useState<Label[]>(() => initialLabels ?? []);
+  const [labels, setLabels] = useState<Label[]>(() => {
+    if (isAdmin) {
+      return initialLabels ?? [];
+    }
+
+    const managerStored = readManagerLabels();
+    if (managerStored.length > 0) {
+      return managerStored;
+    }
+
+    return initialLabels ?? [];
+  });
   const hasLabels = labels.length > 0;
   const [isCreateLabelOpen, setIsCreateLabelOpen] = useState(false);
   const [labelName, setLabelName] = useState("");
   const [labelDescription, setLabelDescription] = useState("");
   const [labelType, setLabelType] = useState<Label["type"]>("Classification");
-  const [labelClasses] = useState(0);
+  const [labelClasses, setLabelClasses] = useState<string[]>([]);
+  const [classInput, setClassInput] = useState("");
+  const [classError, setClassError] = useState("");
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<Label["type"] | "All">("All");
+  const [orderBy, setOrderBy] = useState<"Name" | "Date created">("Date created");
+  const [order, setOrder] = useState<"Ascending" | "Descending">("Descending");
   const [isEditLabelOpen, setIsEditLabelOpen] = useState(false);
   const [activeLabel, setActiveLabel] = useState<Label | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -39,8 +82,76 @@ export default function ManagerLabelsPage({
     {},
   );
 
+  useEffect(() => {
+    if (isAdmin || typeof window === "undefined") {
+      return;
+    }
+
+    localStorage.setItem(MANAGER_LABELS_STORAGE_KEY, JSON.stringify(labels));
+  }, [isAdmin, labels]);
+
+  const visibleLabels = useMemo(() => {
+    const filtered = labels.filter((label) => {
+      const bySearch =
+        label.name.toLowerCase().includes(search.toLowerCase()) ||
+        (label.description ?? "").toLowerCase().includes(search.toLowerCase());
+      const byType = typeFilter === "All" || label.type === typeFilter;
+      return bySearch && byType;
+    });
+
+    const sorted = [...filtered].sort((a, b) => {
+      if (orderBy === "Name") {
+        const compareName = a.name.localeCompare(b.name);
+        return order === "Ascending" ? compareName : -compareName;
+      }
+
+      const compareDate = a.createdAt.localeCompare(b.createdAt);
+      return order === "Ascending" ? compareDate : -compareDate;
+    });
+
+    return sorted;
+  }, [labels, order, orderBy, search, typeFilter]);
+
+  const resetCreateLabelForm = () => {
+    setLabelName("");
+    setLabelDescription("");
+    setLabelType("Classification");
+    setLabelClasses([]);
+    setClassInput("");
+    setClassError("");
+  };
+
+  const handleAddClass = () => {
+    const normalizedClass = classInput.trim();
+    if (!normalizedClass) {
+      return;
+    }
+
+    const exists = labelClasses.some(
+      (existingClass) => existingClass.toLowerCase() === normalizedClass.toLowerCase(),
+    );
+
+    if (exists) {
+      setClassError("Class already exists.");
+      return;
+    }
+
+    setLabelClasses((prev) => [...prev, normalizedClass]);
+    setClassInput("");
+    setClassError("");
+  };
+
+  const handleRemoveClass = (className: string) => {
+    setLabelClasses((prev) => prev.filter((item) => item !== className));
+  };
+
   const handleCreateLabel = (event: FormEvent) => {
     event.preventDefault();
+    if (labelClasses.length === 0) {
+      setClassError("Please add at least one class.");
+      return;
+    }
+
     const now = new Date();
     const createdAt = now.toISOString().slice(0, 10);
     setLabels((prev) => [
@@ -49,15 +160,14 @@ export default function ManagerLabelsPage({
         name: labelName.trim() || "Untitled Label",
         description: labelDescription.trim(),
         type: labelType,
-        totalClasses: labelClasses,
+        totalClasses: labelClasses.length,
+        classes: labelClasses,
         createdAt,
       },
       ...prev,
     ]);
     setIsCreateLabelOpen(false);
-    setLabelName("");
-    setLabelDescription("");
-    setLabelType("Classification");
+    resetCreateLabelForm();
   };
 
   const handleOpenLabelEdit = (label: Label) => {
@@ -96,7 +206,10 @@ export default function ManagerLabelsPage({
         {!isAdmin && (
           <button
             type="button"
-            onClick={() => setIsCreateLabelOpen(true)}
+            onClick={() => {
+              resetCreateLabelForm();
+              setIsCreateLabelOpen(true);
+            }}
             className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
           >
             <span className="text-lg leading-none">+</span>
@@ -122,6 +235,8 @@ export default function ManagerLabelsPage({
               <path d="m21 21-4.3-4.3" />
             </svg>
             <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
               className="w-full text-sm outline-none placeholder:text-gray-400"
               placeholder="Search labels..."
             />
@@ -130,29 +245,48 @@ export default function ManagerLabelsPage({
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Type</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
-            <option>All</option>
-            <option>Classification</option>
-            <option>Bounding Box</option>
-            <option>Polygon</option>
+          <select
+            title="Filter label type"
+            value={typeFilter}
+            onChange={(event) =>
+              setTypeFilter(event.target.value as Label["type"] | "All")
+            }
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
+            <option value="All">All</option>
+            <option value="Classification">Classification</option>
+            <option value="Bounding Box">Bounding Box</option>
+            <option value="Polygon">Polygon</option>
           </select>
         </div>
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Order by</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
-            <option>Name</option>
-            <option>Date created</option>
-            <option>Updated</option>
+          <select
+            title="Order by"
+            value={orderBy}
+            onChange={(event) =>
+              setOrderBy(event.target.value as "Name" | "Date created")
+            }
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
+            <option value="Name">Name</option>
+            <option value="Date created">Date created</option>
           </select>
         </div>
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Order</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
-            <option>All</option>
-            <option>Ascending</option>
-            <option>Descending</option>
+          <select
+            title="Sort order"
+            value={order}
+            onChange={(event) =>
+              setOrder(event.target.value as "Ascending" | "Descending")
+            }
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
+            <option value="Ascending">Ascending</option>
+            <option value="Descending">Descending</option>
           </select>
         </div>
       </div>
@@ -179,7 +313,10 @@ export default function ManagerLabelsPage({
           {!isAdmin && (
             <button
               type="button"
-              onClick={() => setIsCreateLabelOpen(true)}
+              onClick={() => {
+                resetCreateLabelForm();
+                setIsCreateLabelOpen(true);
+              }}
               className="mt-5 flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
             >
               <span className="text-base leading-none">+</span>
@@ -197,7 +334,7 @@ export default function ManagerLabelsPage({
             <span>Action</span>
           </div>
 
-          {labels.map((label) => (
+          {visibleLabels.map((label) => (
             <div
               key={label.id}
               className="grid grid-cols-[1.6fr_2fr_1fr_1fr_0.8fr] items-center gap-2 border-b px-4 py-3 text-sm last:border-b-0"
@@ -244,13 +381,19 @@ export default function ManagerLabelsPage({
               </div>
             </div>
           ))}
+
+          {visibleLabels.length === 0 && (
+            <div className="px-4 py-10 text-center text-sm text-gray-500">
+              No labels found for current filters.
+            </div>
+          )}
         </div>
       )}
 
       {!isAdmin && isCreateLabelOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 px-4 py-6 sm:items-center">
           <div
-            className={`w-full max-w-md rounded-lg border border-gray-300 bg-white shadow-xl ${
+            className={`w-full max-w-lg overflow-hidden rounded-lg border border-gray-300 bg-white shadow-xl ${
               closingModals.createLabel ? "modal-pop-out" : "modal-pop"
             }`}
           >
@@ -258,7 +401,10 @@ export default function ManagerLabelsPage({
               <h3 className="text-sm font-semibold text-gray-800">Create new label</h3>
               <button
                 type="button"
-                onClick={() => closeWithAnimation("createLabel", setIsCreateLabelOpen)}
+                onClick={() => {
+                  closeWithAnimation("createLabel", setIsCreateLabelOpen);
+                  resetCreateLabelForm();
+                }}
                 className="text-gray-500 hover:text-gray-700"
                 aria-label="Close"
               >
@@ -275,7 +421,10 @@ export default function ManagerLabelsPage({
               </button>
             </div>
 
-            <form onSubmit={handleCreateLabel} className="flex flex-col gap-4 p-4">
+            <form
+              onSubmit={handleCreateLabel}
+              className="max-h-[calc(90vh-64px)] space-y-4 overflow-y-auto p-4"
+            >
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-gray-700">Label name</label>
                 <input
@@ -285,6 +434,34 @@ export default function ManagerLabelsPage({
                   placeholder="Example name"
                   required
                 />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-700">Label type</label>
+                  <select
+                    title="Label type"
+                    value={labelType}
+                    onChange={(event) =>
+                      setLabelType(event.target.value as Label["type"])
+                    }
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    <option value="Classification">Classification</option>
+                    <option value="Bounding Box">Bounding Box</option>
+                    <option value="Polygon">Polygon</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-700">Total classes</label>
+                  <input
+                    value={labelClasses.length}
+                    readOnly
+                    title="Total classes"
+                    className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600"
+                  />
+                </div>
               </div>
 
               <div className="flex flex-col gap-1">
@@ -301,59 +478,81 @@ export default function ManagerLabelsPage({
 
               <div className="rounded-md border border-gray-200 p-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-700">
-                    Annotating Checklists
-                  </span>
-                  <button
-                    type="button"
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-700"
-                  >
-                    + Add Checklist
-                  </button>
+                  <span className="text-xs font-semibold text-gray-700">Classes</span>
+                  <span className="text-xs text-gray-500">{labelClasses.length} added</span>
                 </div>
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
                   <input
+                    value={classInput}
+                    onChange={(event) => {
+                      setClassInput(event.target.value);
+                      if (classError) {
+                        setClassError("");
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleAddClass();
+                      }
+                    }}
                     className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
-                    placeholder="Example annotating checklist"
+                    placeholder="Add class name..."
                   />
                   <button
                     type="button"
-                    className="text-red-500 hover:text-red-600"
-                    aria-label="Remove annotating checklist"
+                    onClick={handleAddClass}
+                    className="rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 sm:min-w-[100px]"
                   >
-                    ✕
+                    Add class
                   </button>
+                </div>
+
+                {classError && (
+                  <p className="mt-2 text-xs text-red-600">{classError}</p>
+                )}
+
+                <div className="mt-2 max-h-28 overflow-y-auto pr-1">
+                  <div className="flex flex-wrap gap-2">
+                    {labelClasses.length === 0 ? (
+                      <span className="text-xs text-gray-500">No classes yet.</span>
+                    ) : (
+                      labelClasses.map((className) => (
+                        <span
+                          key={className}
+                          className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
+                        >
+                          {className}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveClass(className)}
+                            className="text-red-500 hover:text-red-600"
+                            aria-label={`Remove class ${className}`}
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="rounded-md border border-gray-200 p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-700">
-                    Reviewing Checklists
-                  </span>
-                  <button
-                    type="button"
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-700"
-                  >
-                    + Add Review Item
-                  </button>
-                </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <input
-                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
-                    placeholder="Example reviewing checklist"
-                  />
-                  <button
-                    type="button"
-                    className="text-red-500 hover:text-red-600"
-                    aria-label="Remove reviewing checklist"
-                  >
-                    ✕
-                  </button>
-                </div>
+              <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                You can edit classes and guideline details after creating this label.
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeWithAnimation("createLabel", setIsCreateLabelOpen);
+                    resetCreateLabelForm();
+                  }}
+                  className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
                   className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
@@ -417,6 +616,22 @@ export default function ManagerLabelsPage({
                   </p>
                 </div>
               </div>
+
+              {detailLabel.classes && detailLabel.classes.length > 0 && (
+                <div className="mt-3 rounded-md border border-gray-200 p-3">
+                  <p className="text-xs font-semibold text-gray-700">Classes</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {detailLabel.classes.map((className) => (
+                      <span
+                        key={className}
+                        className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
+                      >
+                        {className}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
