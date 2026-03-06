@@ -71,6 +71,17 @@ export default function AdminAccountsPage() {
     "Annotator",
   );
   const [newUserPhone, setNewUserPhone] = useState("");
+  const [isEditUserOpen, setIsEditUserOpen] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editUserName, setEditUserName] = useState("");
+  const [editUserEmail, setEditUserEmail] = useState("");
+  const [editUserRole, setEditUserRole] = useState<AdminUser["role"]>(
+    "Annotator",
+  );
+  const [editUserStatus, setEditUserStatus] = useState<AdminUser["status"]>(
+    "Active",
+  );
+  const [editUserPhone, setEditUserPhone] = useState("");
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
@@ -113,6 +124,52 @@ export default function AdminAccountsPage() {
         return next;
       });
     }, 200);
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    setUsers((prev) => prev.filter((user) => user.id !== userId));
+  };
+
+  const resetEditForm = () => {
+    setEditingUserId(null);
+    setEditUserName("");
+    setEditUserEmail("");
+    setEditUserRole("Annotator");
+    setEditUserStatus("Active");
+    setEditUserPhone("");
+  };
+
+  const handleOpenEdit = (user: AdminUser) => {
+    setEditingUserId(user.id);
+    setEditUserName(user.name);
+    setEditUserEmail(user.email);
+    setEditUserRole(user.role);
+    setEditUserStatus(user.status);
+    setEditUserPhone(user.phone);
+    setIsEditUserOpen(true);
+  };
+
+  const handleUpdateUser = (event: FormEvent) => {
+    event.preventDefault();
+    if (!editingUserId) {
+      return;
+    }
+    setUsers((prev) =>
+      prev.map((user) =>
+        user.id === editingUserId
+          ? {
+              ...user,
+              name: editUserName.trim() || "Unnamed User",
+              email: editUserEmail.trim(),
+              role: editUserRole,
+              status: editUserStatus,
+              phone: editUserPhone.trim(),
+            }
+          : user,
+      ),
+    );
+    setIsEditUserOpen(false);
+    resetEditForm();
   };
 
   return (
@@ -240,8 +297,19 @@ export default function AdminAccountsPage() {
                 <button type="button" className="text-blue-600 hover:text-blue-700">
                   Details
                 </button>
-                <button type="button" className="text-blue-600 hover:text-blue-700">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEdit(user)}
+                  className="text-blue-600 hover:text-blue-700"
+                >
                   Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteUser(user.id)}
+                  className="text-red-500 hover:text-red-600"
+                >
+                  Delete
                 </button>
               </div>
             </div>
@@ -351,6 +419,136 @@ export default function AdminAccountsPage() {
                   className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
                 >
                   Create User
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isEditUserOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div
+            className={`w-full max-w-md rounded-lg border border-gray-300 bg-white shadow-xl ${
+              closingModals.editUser ? "modal-pop-out" : "modal-pop"
+            }`}
+          >
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h3 className="text-sm font-semibold text-gray-800">Edit user</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  closeWithAnimation("editUser", setIsEditUserOpen);
+                  resetEditForm();
+                }}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M6 6l12 12" />
+                  <path d="M18 6l-12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateUser} className="flex flex-col gap-4 p-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-700">
+                  User name
+                </label>
+                <input
+                  value={editUserName}
+                  onChange={(event) => setEditUserName(event.target.value)}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="Full name"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-700">Gmail</label>
+                <input
+                  type="email"
+                  value={editUserEmail}
+                  onChange={(event) => setEditUserEmail(event.target.value)}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="name@gmail.com"
+                  pattern="^[^@\s]+@gmail\.com$"
+                  title="Enter a valid Gmail address (name@gmail.com)"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-700">Roles</label>
+                <select
+                  value={editUserRole}
+                  onChange={(event) =>
+                    setEditUserRole(event.target.value as AdminUser["role"])
+                  }
+                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                  required
+                >
+                  <option>Admin</option>
+                  <option>Manager</option>
+                  <option>Reviewer</option>
+                  <option>Annotator</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-700">Status</label>
+                <select
+                  value={editUserStatus}
+                  onChange={(event) =>
+                    setEditUserStatus(event.target.value as AdminUser["status"])
+                  }
+                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                  required
+                >
+                  <option>Active</option>
+                  <option>Suspended</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-700">
+                  Phone number
+                </label>
+                <input
+                  type="tel"
+                  value={editUserPhone}
+                  onChange={(event) => setEditUserPhone(event.target.value)}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="+1 555 000 1234"
+                  pattern="^\+?[0-9\s-]{8,15}$"
+                  title="Use 8-15 digits; spaces, dashes, and optional leading + are allowed"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeWithAnimation("editUser", setIsEditUserOpen);
+                    resetEditForm();
+                  }}
+                  className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                >
+                  Save Changes
                 </button>
               </div>
             </form>

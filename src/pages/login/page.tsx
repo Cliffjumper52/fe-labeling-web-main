@@ -15,8 +15,11 @@ export default function LoginPage() {
       const accessToken = result?.data?.accessToken;
       const refreshToken = result?.data?.refreshToken;
       const role = result?.data?.user?.role;
+      const username = result?.data?.user?.username ?? email;
       if (accessToken) localStorage.setItem("accessToken", accessToken);
       if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
+      localStorage.setItem("currentUserName", username);
+      if (role) localStorage.setItem("currentUserRole", role);
       toast.success("Login successful");
       if (role === "admin") {
         navigate("/admin");
