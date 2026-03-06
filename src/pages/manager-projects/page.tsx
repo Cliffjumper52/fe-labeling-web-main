@@ -9,6 +9,8 @@ import {
   type SetStateAction,
 } from "react";
 import { createPortal } from "react-dom";
+import { toast } from "sonner";
+import { saveFilesToImageStore, type StoredImageRef } from "../../utils/image-store";
 
 type Project = {
   id: string;
@@ -39,10 +41,55 @@ type UploadedImage = {
   dataUrl: string;
 };
 
+type UploadImageFile = {
+  name: string;
+  file: File;
+};
+
+const createImagePlaceholderDataUrl = (label: string) => {
+  const safe = encodeURIComponent(label);
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360'><rect width='100%' height='100%' fill='#f3f4f6'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#374151' font-size='20' font-family='Arial, sans-serif'>${safe}</text></svg>`;
+  return `data:image/svg+xml;utf8,${svg}`;
+};
+
+const toLightweightImages = (images: UploadedImage[]) => {
+  return images.map((image) => ({
+    name: image.name,
+    dataUrl: createImagePlaceholderDataUrl(image.name),
+  }));
+};
+
+const compactUnknownImages = (value: unknown): UploadedImage[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (typeof item !== "object" || item === null) {
+        return null;
+      }
+
+      const raw = item as { name?: unknown };
+      if (typeof raw.name !== "string") {
+        return null;
+      }
+
+      return {
+        name: raw.name,
+        dataUrl: createImagePlaceholderDataUrl(raw.name),
+      };
+    })
+    .filter((item): item is UploadedImage => item !== null);
+};
+
 const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
 const ANNOTATOR_TASKS_UPDATED_EVENT = "annotator-tasks-updated";
 const ADMIN_USERS_STORAGE_KEY = "admin-users";
 const ADMIN_USERS_UPDATED_EVENT = "admin-users-updated";
+const MANAGER_PRESETS_STORAGE_KEY = "manager-presets";
+const MANAGER_PRESETS_UPDATED_EVENT = "manager-presets-updated";
+const MANAGER_PROJECTS_STORAGE_KEY = "manager-projects";
 
 type AdminStorageUser = {
   id: string;
@@ -121,13 +168,69 @@ type ManagerProjectsPageProps = {
   initialProjects?: Project[];
 };
 
+const fallbackPresets: Preset[] = [
+  {
+    id: "preset-1",
+    name: "Retail SKU V2",
+    description: "Bounding boxes for shelf-facing SKUs.",
+    labels: ["Cereal", "Snack", "Soda"],
+    createdAt: "2026-02-10",
+  },
+  {
+    id: "preset-2",
+    name: "Vehicle Boxes",
+    description: "Cars, buses, bikes, and trucks.",
+    labels: ["Car", "Bus", "Bike", "Truck"],
+    createdAt: "2026-02-12",
+  },
+];
+
+const readManagerPresets = (): Preset[] => {
+  if (typeof window === "undefined") {
+    return fallbackPresets;
+  }
+
+  const raw = localStorage.getItem(MANAGER_PRESETS_STORAGE_KEY);
+  if (!raw) {
+    return fallbackPresets;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Preset[];
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return fallbackPresets;
+    }
+    return parsed;
+  } catch {
+    return fallbackPresets;
+  }
+};
+
+const readManagerProjects = (initialProjects?: Project[]): Project[] => {
+  if (typeof window === "undefined") {
+    return initialProjects ?? [];
+  }
+
+  const raw = localStorage.getItem(MANAGER_PROJECTS_STORAGE_KEY);
+  if (!raw) {
+    return initialProjects ?? [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Project[];
+    return Array.isArray(parsed) ? parsed : initialProjects ?? [];
+  } catch {
+    return initialProjects ?? [];
+  }
+};
+
 export default function ManagerProjectsPage({
   mode = "manager",
   initialProjects,
 }: ManagerProjectsPageProps) {
   const isAdmin = mode === "admin";
-  const [projects, setProjects] = useState<Project[]>(
-    () => initialProjects ?? [],
+  const [projects, setProjects] = useState<Project[]>(() =>
+    isAdmin ? initialProjects ?? [] : readManagerProjects(initialProjects),
   );
   const hasProjects = projects.length > 0;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -138,27 +241,16 @@ export default function ManagerProjectsPage({
   );
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
-  const [presets] = useState<Preset[]>([
-    {
-      id: "preset-1",
-      name: "Retail SKU V2",
-      description: "Bounding boxes for shelf-facing SKUs.",
-      labels: ["Cereal", "Snack", "Soda"],
-      createdAt: "2026-02-10",
-    },
-    {
-      id: "preset-2",
-      name: "Vehicle Boxes",
-      description: "Cars, buses, bikes, and trucks.",
-      labels: ["Car", "Bus", "Bike", "Truck"],
-      createdAt: "2026-02-12",
-    },
-  ]);
+  const [editProjectName, setEditProjectName] = useState("");
+  const [editProjectDescription, setEditProjectDescription] = useState("");
+  const [editProjectDataType, setEditProjectDataType] = useState<Project["dataType"]>("Image");
+  const [presets, setPresets] = useState<Preset[]>(() => readManagerPresets());
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedUploadFiles, setSelectedUploadFiles] = useState<File[]>([]);
   const [uploadName, setUploadName] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
+  const [uploadedImageFiles, setUploadedImageFiles] = useState<UploadImageFile[]>([]);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailProject, setDetailProject] = useState<Project | null>(null);
@@ -166,6 +258,7 @@ export default function ManagerProjectsPage({
   const [isAssignReviewersOpen, setIsAssignReviewersOpen] = useState(false);
   const [isSelectPresetOpen, setIsSelectPresetOpen] = useState(false);
   const [assignSearch, setAssignSearch] = useState("");
+  const [presetSearch, setPresetSearch] = useState("");
   const [selectedAnnotators, setSelectedAnnotators] = useState<string[]>([]);
   const [selectedReviewers, setSelectedReviewers] = useState<string[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
@@ -202,6 +295,15 @@ export default function ManagerProjectsPage({
 
   const handleOpenEdit = (project: Project) => {
     setActiveProject(project);
+    setEditProjectName(project.name);
+    setEditProjectDescription(project.description ?? "");
+    setEditProjectDataType(project.dataType);
+    setSelectedAnnotators([]);
+    setSelectedReviewers([]);
+    setSelectedPreset(null);
+    setUploadedFiles([]);
+    setUploadedImages([]);
+    setUploadedImageFiles([]);
     setIsEditOpen(true);
     setIsUploadOpen(false);
     setIsAssignAnnotatorsOpen(false);
@@ -248,8 +350,14 @@ export default function ManagerProjectsPage({
         })),
       );
 
+      const filePayload = selectedUploadFiles.map((file, index) => ({
+        name: updatedNames[index],
+        file,
+      }));
+
       setUploadedFiles((prev) => [...prev, ...updatedNames]);
       setUploadedImages((prev) => [...prev, ...imagePayload]);
+      setUploadedImageFiles((prev) => [...prev, ...filePayload]);
     }
     setIsUploadOpen(false);
     setSelectedUploadFiles([]);
@@ -282,14 +390,44 @@ export default function ManagerProjectsPage({
     if (!activeProject) {
       return;
     }
+
+    const nextName = editProjectName.trim() || activeProject.name;
+    const nextDescription = editProjectDescription.trim();
+
     setProjects((prev) =>
       prev.map((project) =>
-        project.id === activeProject.id ? { ...project, status } : project,
+        project.id === activeProject.id
+          ? {
+              ...project,
+              name: nextName,
+              description: nextDescription,
+              dataType: editProjectDataType,
+              status,
+            }
+          : project,
       ),
     );
-    setActiveProject((prev) => (prev ? { ...prev, status } : prev));
+    setActiveProject((prev) =>
+      prev
+        ? {
+            ...prev,
+            name: nextName,
+            description: nextDescription,
+            dataType: editProjectDataType,
+            status,
+          }
+        : prev,
+    );
     setDetailProject((prev) =>
-      prev && prev.id === activeProject.id ? { ...prev, status } : prev,
+      prev && prev.id === activeProject.id
+        ? {
+            ...prev,
+            name: nextName,
+            description: nextDescription,
+            dataType: editProjectDataType,
+            status,
+          }
+        : prev,
     );
   };
 
@@ -298,16 +436,21 @@ export default function ManagerProjectsPage({
     closeWithAnimation("editProject", setIsEditOpen);
   };
 
-  const pushTaskToAnnotatorQueue = () => {
+  const pushTaskToAnnotatorQueue = async () => {
     if (!activeProject) {
-      return;
+      return false;
     }
     const assignedNames = resolveNames(annotators, selectedAnnotators);
     const today = new Date();
     const dueDate = new Date(today);
     dueDate.setDate(today.getDate() + 7);
 
-    const payload = {
+    let uploadedImageRefs: StoredImageRef[] = [];
+    if (uploadedImageFiles.length > 0) {
+      uploadedImageRefs = await saveFilesToImageStore(uploadedImageFiles);
+    }
+
+    const basePayload = {
       id: `task-${activeProject.id}`,
       projectName: activeProject.name,
       dataset:
@@ -330,24 +473,80 @@ export default function ManagerProjectsPage({
         "Quality self-check completed",
       ],
       labels: selectedPreset?.labels ?? ["Label A", "Label B"],
-      uploadedImages,
       assignedAnnotators: assignedNames,
+      uploadedImageRefs,
     };
 
     const raw = localStorage.getItem(ANNOTATOR_TASKS_STORAGE_KEY);
-    const existing = raw ? (JSON.parse(raw) as Array<Record<string, unknown>>) : [];
-    const next = [
-      payload,
-      ...existing.filter((item) => item.id !== payload.id),
-    ];
-    localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(next));
-    window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
+    let existing: Array<Record<string, unknown>> = [];
+
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
+        existing = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        existing = [];
+      }
+    }
+
+    const buildNext = (images: UploadedImage[]) => {
+      const payload = {
+        ...basePayload,
+        uploadedImages: images,
+      };
+
+      return [
+        payload,
+        ...existing.filter((item) => item.id !== payload.id),
+      ];
+    };
+
+    try {
+      const next = buildNext(toLightweightImages(uploadedImages));
+      localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(next));
+      window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
+      return true;
+    } catch {
+      try {
+        const compactExisting: Array<Record<string, unknown>> = existing.map((item) => ({
+          ...item,
+          uploadedImages: compactUnknownImages(item.uploadedImages),
+          submittedImages: compactUnknownImages(item.submittedImages),
+        }));
+
+        const payload = {
+          ...basePayload,
+          uploadedImages: toLightweightImages(uploadedImages),
+        };
+
+        const next = [
+          payload,
+          ...compactExisting.filter((item) => item["id"] !== payload.id),
+        ];
+        localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(next));
+        window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
+        toast.warning("Images were optimized for storage limit. Assignment still succeeded.");
+        return true;
+      } catch {
+        return false;
+      }
+    }
   };
 
-  const handleConfirmAssigned = () => {
-    pushTaskToAnnotatorQueue();
-    updateProjectStatus("Active");
-    closeWithAnimation("editProject", setIsEditOpen);
+  const handleConfirmAssigned = async () => {
+    try {
+      const queued = await pushTaskToAnnotatorQueue();
+      if (!queued) {
+        toast.error("Assign failed: storage is full or project data is invalid.");
+        return;
+      }
+
+      updateProjectStatus("Active");
+      toast.success("Project assigned successfully.");
+      closeWithAnimation("editProject", setIsEditOpen);
+    } catch {
+      toast.error("Assign failed. Please try again.");
+    }
   };
 
   const handleOverlayClick = (
@@ -371,6 +570,48 @@ export default function ManagerProjectsPage({
   const resolveNames = (list: TeamMember[], ids: string[]) => {
     return ids.map((id) => list.find((item) => item.id === id)?.name || id);
   };
+
+  useEffect(() => {
+    if (isAdmin || typeof window === "undefined") {
+      return;
+    }
+
+    localStorage.setItem(MANAGER_PROJECTS_STORAGE_KEY, JSON.stringify(projects));
+  }, [isAdmin, projects]);
+
+  useEffect(() => {
+    const refreshPresets = () => {
+      setPresets(readManagerPresets());
+    };
+
+    window.addEventListener("storage", refreshPresets);
+    window.addEventListener(MANAGER_PRESETS_UPDATED_EVENT, refreshPresets);
+
+    return () => {
+      window.removeEventListener("storage", refreshPresets);
+      window.removeEventListener(MANAGER_PRESETS_UPDATED_EVENT, refreshPresets);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedPreset) {
+      return;
+    }
+
+    const latest = presets.find((preset) => preset.id === selectedPreset.id);
+    if (!latest) {
+      setSelectedPreset(null);
+      return;
+    }
+
+    if (
+      latest.name !== selectedPreset.name ||
+      latest.description !== selectedPreset.description ||
+      latest.labels.join("|") !== selectedPreset.labels.join("|")
+    ) {
+      setSelectedPreset(latest);
+    }
+  }, [presets, selectedPreset]);
 
   useEffect(() => {
     const refreshMembers = () => {
@@ -783,16 +1024,52 @@ export default function ManagerProjectsPage({
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-base font-semibold text-gray-900">
-                      {activeProject.name}
+                      {editProjectName || activeProject.name}
                     </h2>
                     <p className="mt-1 text-xs text-gray-500">
-                      {activeProject.description ||
+                      {editProjectDescription ||
                         "Example Image Classification Example"}
                     </p>
                   </div>
                   <span className="rounded-md bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
                     {activeProject.status}
                   </span>
+                </div>
+              </div>
+
+              <div className="mt-2 grid grid-cols-1 gap-2 rounded-md border border-gray-200 p-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-1 sm:col-span-2">
+                  <label className="text-xs font-semibold text-gray-700">Project name</label>
+                  <input
+                    value={editProjectName}
+                    onChange={(event) => setEditProjectName(event.target.value)}
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="Project name"
+                  />
+                </div>
+                <div className="flex flex-col gap-1 sm:col-span-2">
+                  <label className="text-xs font-semibold text-gray-700">Project description</label>
+                  <textarea
+                    value={editProjectDescription}
+                    onChange={(event) => setEditProjectDescription(event.target.value)}
+                    className="min-h-[80px] rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="Project description"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-700">Data type</label>
+                  <select
+                    value={editProjectDataType}
+                    onChange={(event) =>
+                      setEditProjectDataType(event.target.value as Project["dataType"])
+                    }
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    <option value="Image">Image</option>
+                    <option value="Video">Video</option>
+                    <option value="Text">Text</option>
+                    <option value="Audio">Audio</option>
+                  </select>
                 </div>
               </div>
 
@@ -904,6 +1181,7 @@ export default function ManagerProjectsPage({
                             return;
                           }
                           if (section.id === "presets") {
+                            setPresetSearch("");
                             setIsSelectPresetOpen(true);
                           }
                         }}
@@ -1354,6 +1632,8 @@ export default function ManagerProjectsPage({
             </div>
             <div className="p-4">
               <input
+                value={presetSearch}
+                onChange={(event) => setPresetSearch(event.target.value)}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                 placeholder="Search presets"
               />
@@ -1368,8 +1648,20 @@ export default function ManagerProjectsPage({
                 <div className="mt-2 space-y-2 rounded-md border border-gray-300 p-3">
                   {presets.length === 0 ? (
                     <span className="text-xs text-gray-400">No presets available</span>
+                  ) : presets.filter((preset) =>
+                      `${preset.name} ${preset.description ?? ""}`
+                        .toLowerCase()
+                        .includes(presetSearch.toLowerCase()),
+                    ).length === 0 ? (
+                    <span className="text-xs text-gray-400">No matching preset</span>
                   ) : (
-                    presets.map((preset) => (
+                    presets
+                      .filter((preset) =>
+                        `${preset.name} ${preset.description ?? ""}`
+                          .toLowerCase()
+                          .includes(presetSearch.toLowerCase()),
+                      )
+                      .map((preset) => (
                       <button
                         key={preset.id}
                         type="button"

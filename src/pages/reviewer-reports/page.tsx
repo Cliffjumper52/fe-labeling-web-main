@@ -57,11 +57,18 @@ export default function ReviewerReportsPage() {
   const tasks = loadTasks();
 
   const metrics = useMemo(() => {
-    const approved = tasks.filter((task) => task.qaDecision === "Approved").length;
-    const rejected = tasks.filter((task) => task.qaDecision === "Rejected").length;
-    const pending = tasks.filter((task) => task.status === "Pending Review").length;
+    const approved = tasks.filter(
+      (task) => task.qaDecision === "Approved",
+    ).length;
+    const rejected = tasks.filter(
+      (task) => task.qaDecision === "Rejected",
+    ).length;
+    const pending = tasks.filter(
+      (task) => task.status === "Pending Review",
+    ).length;
     const totalReviewed = approved + rejected;
-    const accuracy = totalReviewed > 0 ? Math.round((approved / totalReviewed) * 100) : 0;
+    const accuracy =
+      totalReviewed > 0 ? Math.round((approved / totalReviewed) * 100) : 0;
 
     const errorCount = tasks.reduce<Record<string, number>>((acc, task) => {
       (task.errorTypes || []).forEach((errorType) => {
@@ -70,7 +77,10 @@ export default function ReviewerReportsPage() {
       return acc;
     }, {});
 
-    const scoreImpact = tasks.reduce((sum, task) => sum + (task.annotatorScoreDelta || 0), 0);
+    const scoreImpact = tasks.reduce(
+      (sum, task) => sum + (task.annotatorScoreDelta || 0),
+      0,
+    );
 
     return { approved, rejected, pending, accuracy, errorCount, scoreImpact };
   }, [tasks]);
@@ -78,33 +88,62 @@ export default function ReviewerReportsPage() {
   return (
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-4">
-        <h2 className="text-xl font-semibold text-gray-800">Reviewer Reports</h2>
+        <h2 className="text-xl font-semibold text-gray-800">
+          Reviewer Reports
+        </h2>
         <p className="text-sm text-gray-500">
           QA outcome overview and common error trends.
         </p>
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricCard title="Approved" value={String(metrics.approved)} tone="green" />
-        <MetricCard title="Rejected" value={String(metrics.rejected)} tone="red" />
-        <MetricCard title="Pending" value={String(metrics.pending)} tone="amber" />
-        <MetricCard title="Approval Rate" value={`${metrics.accuracy}%`} tone="blue" />
-        <MetricCard title="Score Impact" value={`${metrics.scoreImpact}`} tone="purple" />
+        <MetricCard
+          title="Approved"
+          value={String(metrics.approved)}
+          tone="green"
+        />
+        <MetricCard
+          title="Rejected"
+          value={String(metrics.rejected)}
+          tone="red"
+        />
+        <MetricCard
+          title="Pending"
+          value={String(metrics.pending)}
+          tone="amber"
+        />
+        <MetricCard
+          title="Approval Rate"
+          value={`${metrics.accuracy}%`}
+          tone="blue"
+        />
+        <MetricCard
+          title="Score Impact"
+          value={`${metrics.scoreImpact}`}
+          tone="purple"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="border-b px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-800">Recent Reviewed Tasks</h3>
+            <h3 className="text-sm font-semibold text-gray-800">
+              Recent Reviewed Tasks
+            </h3>
           </div>
           <div className="divide-y">
             {tasks
               .filter((task) => task.qaDecision)
               .slice(0, 10)
               .map((task) => (
-                <div key={task.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                <div
+                  key={task.id}
+                  className="flex items-center justify-between px-4 py-3 text-sm"
+                >
                   <div>
-                    <p className="font-semibold text-gray-800">{task.projectName}</p>
+                    <p className="font-semibold text-gray-800">
+                      {task.projectName}
+                    </p>
                     <p className="text-xs text-gray-500">{task.dataset}</p>
                   </div>
                   <div className="text-right">
@@ -117,7 +156,9 @@ export default function ReviewerReportsPage() {
                     >
                       {task.qaDecision}
                     </span>
-                    <p className="mt-1 text-xs text-gray-500">{task.qaReviewedAt || "-"}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {task.qaReviewedAt || "-"}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -126,11 +167,15 @@ export default function ReviewerReportsPage() {
 
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="border-b px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-800">Top Error Categories</h3>
+            <h3 className="text-sm font-semibold text-gray-800">
+              Top Error Categories
+            </h3>
           </div>
           <div className="space-y-2 p-4">
             {Object.entries(metrics.errorCount).length === 0 ? (
-              <p className="text-sm text-gray-500">No error categories available.</p>
+              <p className="text-sm text-gray-500">
+                No error categories available.
+              </p>
             ) : (
               Object.entries(metrics.errorCount)
                 .sort((a, b) => b[1] - a[1])
