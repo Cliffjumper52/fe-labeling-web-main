@@ -1,5 +1,5 @@
 import axios from "axios";
-import api from "../api/axios";
+import api, { refreshApi } from "../api/axios";
 
 export const login = async (username: string, password: string) => {
   try {
@@ -61,7 +61,7 @@ export const login = async (username: string, password: string) => {
   }
 };
 
-export const getInfoByToken = async (token: string) => {
+export const getInfoByToken = async () => {
   try {
     const resp = await api.get("/auth/me");
     return resp;
@@ -76,7 +76,7 @@ export const updatePassword = async (
   newPassword: string,
 ) => {
   try {
-    const resp = await api.post(`/auth/update-password/${id}`, {
+    const resp = await api.patch(`/auth/update-password/${id}`, {
       currentPassword,
       newPassword,
     });
@@ -88,7 +88,7 @@ export const updatePassword = async (
 
 export const resetPassword = async (email: string) => {
   try {
-    const resp = await api.post("/auth/reset-password", { email });
+    const resp = await api.patch("/auth/reset-password", { email });
     return resp;
   } catch (error) {
     throw error;
@@ -98,7 +98,7 @@ export const resetPassword = async (email: string) => {
 export const refreshToken = async () => {
   try {
     //intentional, use axios directly to avoid infinite loop of interceptors when refreshing token
-    const resp = await axios.post("/auth/refresh", {});
+    const resp = refreshApi.post("/auth/refresh", {});
     return resp;
   } catch (error) {
     throw error;

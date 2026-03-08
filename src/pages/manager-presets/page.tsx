@@ -67,14 +67,6 @@ export default function ManagerPresetsPage({
   const [selectedPresetLabels, setSelectedPresetLabels] = useState<string[]>(
     [],
   );
-  const [isEditPresetOpen, setIsEditPresetOpen] = useState(false);
-  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
-  const [editPresetName, setEditPresetName] = useState("");
-  const [editPresetDescription, setEditPresetDescription] = useState("");
-  const [editPresetLabelQuery, setEditPresetLabelQuery] = useState("");
-  const [editSelectedPresetLabels, setEditSelectedPresetLabels] = useState<
-    string[]
-  >([]);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailPreset, setDetailPreset] = useState<Preset | null>(null);
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
@@ -161,57 +153,6 @@ export default function ManagerPresetsPage({
 
   const handleRemovePresetLabel = (label: string) => {
     setSelectedPresetLabels((prev) => prev.filter((item) => item !== label));
-  };
-
-  const handleOpenEditPreset = (preset: Preset) => {
-    setEditingPresetId(preset.id);
-    setEditPresetName(preset.name);
-    setEditPresetDescription(preset.description ?? "");
-    setEditSelectedPresetLabels(preset.labels);
-    setEditPresetLabelQuery("");
-    setIsEditPresetOpen(true);
-  };
-
-  const handleAddEditPresetLabel = () => {
-    const trimmed = editPresetLabelQuery.trim();
-    if (!trimmed) {
-      return;
-    }
-    setEditSelectedPresetLabels((prev) =>
-      prev.includes(trimmed) ? prev : [...prev, trimmed],
-    );
-    setEditPresetLabelQuery("");
-  };
-
-  const handleRemoveEditPresetLabel = (label: string) => {
-    setEditSelectedPresetLabels((prev) =>
-      prev.filter((item) => item !== label),
-    );
-  };
-
-  const handleUpdatePreset = (event: FormEvent) => {
-    event.preventDefault();
-    if (!editingPresetId) {
-      return;
-    }
-    setPresets((prev) =>
-      prev.map((preset) =>
-        preset.id === editingPresetId
-          ? {
-              ...preset,
-              name: editPresetName.trim() || "Untitled Preset",
-              description: editPresetDescription.trim(),
-              labels: editSelectedPresetLabels,
-            }
-          : preset,
-      ),
-    );
-    setIsEditPresetOpen(false);
-    setEditingPresetId(null);
-    setEditPresetName("");
-    setEditPresetDescription("");
-    setEditPresetLabelQuery("");
-    setEditSelectedPresetLabels([]);
   };
 
   const handleOpenPresetDetails = (preset: Preset) => {
