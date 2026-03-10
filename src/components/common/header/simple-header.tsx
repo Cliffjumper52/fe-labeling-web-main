@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../../context/auth-context.context";
 
 export default function SimpleHeader() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const todayLabel = new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
   }).format(new Date());
@@ -33,8 +35,7 @@ export default function SimpleHeader() {
   }, [location.pathname]);
 
   const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
+    logout();
     setIsProfileOpen(false);
     navigate("/login");
   };
