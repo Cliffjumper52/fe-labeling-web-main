@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 export default function SimpleHeader() {
   const navigate = useNavigate();
@@ -7,6 +7,30 @@ export default function SimpleHeader() {
     dateStyle: "medium",
   }).format(new Date());
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [displayName, setDisplayName] = useState("Admin");
+  const [displayRole, setDisplayRole] = useState("Admin");
+  const location = useLocation();
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const storedName = localStorage.getItem("currentUserName");
+    const storedRole = localStorage.getItem("currentUserRole");
+    if (storedName) {
+      setDisplayName(storedName);
+    }
+    if (storedRole) {
+      setDisplayRole(storedRole);
+    }
+  }, []);
+
+  useEffect(() => {
+    const roleFromPath = location.pathname.split("/")[1];
+    if (roleFromPath) {
+      setDisplayRole(roleFromPath);
+    }
+  }, [location.pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
@@ -62,8 +86,8 @@ export default function SimpleHeader() {
                 className="h-7 w-7 rounded-full"
               />
               <div className="flex flex-col items-start text-xs leading-tight">
-                <span className="font-semibold text-white">Admin</span>
-                <span className="text-white/60">Control room</span>
+                <span className="font-semibold text-white">{displayName}</span>
+                <span className="text-white/60">{displayRole}</span>
               </div>
               <svg
                 viewBox="0 0 24 24"

@@ -30,6 +30,8 @@ type ReviewTask = {
   reviewerNote?: string;
   errorTypes?: string[];
   assignedAnnotators?: string[];
+  assignedReviewers?: string[];
+  assignedReviewerIds?: string[];
   uploadedImages?: Array<{ name: string; dataUrl: string }>;
   submittedImages?: Array<{ name: string; dataUrl: string }>;
   uploadedImageRefs?: StoredImageRef[];
@@ -42,6 +44,16 @@ type ReviewTask = {
 
 const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
 const ANNOTATOR_TASKS_UPDATED_EVENT = "annotator-tasks-updated";
+const ADMIN_USERS_STORAGE_KEY = "admin-users";
+
+type AdminStorageUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: "Admin" | "Manager" | "Reviewer" | "Annotator";
+  status: "Active" | "Suspended";
+  phone: string;
+};
 
 const seedTasks: ReviewTask[] = [
   {
@@ -113,6 +125,47 @@ const loadTasks = (): ReviewTask[] => {
   }
 };
 
+const getCurrentReviewerIdentity = (): { keys: string[]; id: string | null } => {
+  if (typeof window === "undefined") {
+    return { keys: [], id: null };
+  }
+
+  const currentUserName = localStorage.getItem("currentUserName")?.trim();
+  if (!currentUserName) {
+    return { keys: [], id: null };
+  }
+
+  const keys = new Set([currentUserName]);
+  const atIndex = currentUserName.indexOf("@");
+  if (atIndex > 0) {
+    keys.add(currentUserName.slice(0, atIndex));
+  }
+  let reviewerId: string | null = null;
+
+  const raw = localStorage.getItem(ADMIN_USERS_STORAGE_KEY);
+  if (!raw) {
+    return { keys: Array.from(keys), id: reviewerId };
+  }
+
+  try {
+    const users = JSON.parse(raw) as AdminStorageUser[];
+    const matched = users.find(
+      (user) =>
+        user.name.toLowerCase() === currentUserName.toLowerCase() ||
+        user.email.toLowerCase() === currentUserName.toLowerCase(),
+    );
+    if (matched) {
+      keys.add(matched.name);
+      keys.add(matched.email);
+      reviewerId = matched.id;
+    }
+  } catch {
+    return { keys: Array.from(keys), id: reviewerId };
+  }
+
+  return { keys: Array.from(keys), id: reviewerId };
+};
+
 const saveTasks = (tasks: ReviewTask[]) => {
   localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(tasks));
   window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
@@ -128,7 +181,7 @@ export default function ReviewerQueuePage() {
   const [tasks, setTasks] = useState<ReviewTask[]>(() => loadTasks());
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "All">(
-    "Pending Review",
+    "All",
   );
   const [activeTask] = useState<ReviewTask | null>(null);
   const [isInspectOpen, setIsInspectOpen] = useState(false);
@@ -164,12 +217,26 @@ export default function ReviewerQueuePage() {
   }, [isInspectOpen]);
 
   const filteredTasks = useMemo(() => {
+    const reviewerIdentity = getCurrentReviewerIdentity();
     return tasks.filter((task) => {
       const bySearch =
         task.projectName.toLowerCase().includes(search.toLowerCase()) ||
         task.dataset.toLowerCase().includes(search.toLowerCase());
       const byStatus = statusFilter === "All" || task.status === statusFilter;
-      return bySearch && byStatus;
+      const hasReviewerAssignment =
+        (task.assignedReviewers?.length ?? 0) > 0 ||
+        (task.assignedReviewerIds?.length ?? 0) > 0;
+      const byReviewer =
+        !hasReviewerAssignment ||
+        reviewerIdentity.keys.length === 0 ||
+        (reviewerIdentity.id !== null &&
+          (task.assignedReviewerIds ?? []).includes(reviewerIdentity.id)) ||
+        (task.assignedReviewers ?? []).some((reviewer) =>
+          reviewerIdentity.keys.some(
+            (key) => reviewer.toLowerCase() === key.toLowerCase(),
+          ),
+        );
+      return bySearch && byStatus && byReviewer;
     });
   }, [tasks, search, statusFilter]);
 

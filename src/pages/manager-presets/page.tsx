@@ -59,20 +59,40 @@ export default function ManagerPresetsPage({
   });
   const hasPresets = presets.length > 0;
   const [isCreatePresetOpen, setIsCreatePresetOpen] = useState(false);
-  const [isEditPresetOpen, setIsEditPresetOpen] = useState(false);
-  const [activePreset, setActivePreset] = useState<Preset | null>(null);
   const [presetName, setPresetName] = useState("");
   const [presetDescription, setPresetDescription] = useState("");
   const [presetLabelQuery, setPresetLabelQuery] = useState("");
   const [selectedPresetLabels, setSelectedPresetLabels] = useState<string[]>(
     [],
   );
+  const [isEditPresetOpen, setIsEditPresetOpen] = useState(false);
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+  const [editPresetName, setEditPresetName] = useState("");
+  const [editPresetDescription, setEditPresetDescription] = useState("");
+  const [editPresetLabelQuery, setEditPresetLabelQuery] = useState("");
+  const [editSelectedPresetLabels, setEditSelectedPresetLabels] = useState<
+    string[]
+  >([]);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailPreset, setDetailPreset] = useState<Preset | null>(null);
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
 
+  const resetCreatePresetForm = () => {
+    setPresetName("");
+    setPresetDescription("");
+    setPresetLabelQuery("");
+    setSelectedPresetLabels([]);
+  };
+
+  const resetEditPresetForm = () => {
+    setEditingPresetId(null);
+    setEditPresetName("");
+    setEditPresetDescription("");
+    setEditPresetLabelQuery("");
+    setEditSelectedPresetLabels([]);
+  };
   useEffect(() => {
     if (isAdmin || typeof window === "undefined") {
       return;
@@ -81,14 +101,6 @@ export default function ManagerPresetsPage({
     localStorage.setItem(MANAGER_PRESETS_STORAGE_KEY, JSON.stringify(presets));
     window.dispatchEvent(new CustomEvent(MANAGER_PRESETS_UPDATED_EVENT));
   }, [isAdmin, presets]);
-
-  const resetPresetForm = () => {
-    setPresetName("");
-    setPresetDescription("");
-    setPresetLabelQuery("");
-    setSelectedPresetLabels([]);
-    setActivePreset(null);
-  };
 
   const handleCreatePreset = (event: FormEvent) => {
     event.preventDefault();
@@ -105,39 +117,7 @@ export default function ManagerPresetsPage({
       ...prev,
     ]);
     setIsCreatePresetOpen(false);
-    resetPresetForm();
-  };
-
-  const handleOpenEditPreset = (preset: Preset) => {
-    setActivePreset(preset);
-    setPresetName(preset.name);
-    setPresetDescription(preset.description ?? "");
-    setSelectedPresetLabels(preset.labels);
-    setPresetLabelQuery("");
-    setIsEditPresetOpen(true);
-  };
-
-  const handleUpdatePreset = (event: FormEvent) => {
-    event.preventDefault();
-    if (!activePreset) {
-      return;
-    }
-
-    setPresets((prev) =>
-      prev.map((preset) =>
-        preset.id === activePreset.id
-          ? {
-              ...preset,
-              name: presetName.trim() || "Untitled Preset",
-              description: presetDescription.trim(),
-              labels: selectedPresetLabels,
-            }
-          : preset,
-      ),
-    );
-
-    setIsEditPresetOpen(false);
-    resetPresetForm();
+    resetCreatePresetForm();
   };
 
   const handleAddPresetLabel = () => {
@@ -153,6 +133,57 @@ export default function ManagerPresetsPage({
 
   const handleRemovePresetLabel = (label: string) => {
     setSelectedPresetLabels((prev) => prev.filter((item) => item !== label));
+  };
+
+  const handleOpenEditPreset = (preset: Preset) => {
+    setEditingPresetId(preset.id);
+    setEditPresetName(preset.name);
+    setEditPresetDescription(preset.description ?? "");
+    setEditSelectedPresetLabels(preset.labels);
+    setEditPresetLabelQuery("");
+    setIsEditPresetOpen(true);
+  };
+
+  const handleAddEditPresetLabel = () => {
+    const trimmed = editPresetLabelQuery.trim();
+    if (!trimmed) {
+      return;
+    }
+    setEditSelectedPresetLabels((prev) =>
+      prev.includes(trimmed) ? prev : [...prev, trimmed],
+    );
+    setEditPresetLabelQuery("");
+  };
+
+  const handleRemoveEditPresetLabel = (label: string) => {
+    setEditSelectedPresetLabels((prev) =>
+      prev.filter((item) => item !== label),
+    );
+  };
+
+  const handleUpdatePreset = (event: FormEvent) => {
+    event.preventDefault();
+    if (!editingPresetId) {
+      return;
+    }
+    setPresets((prev) =>
+      prev.map((preset) =>
+        preset.id === editingPresetId
+          ? {
+              ...preset,
+              name: editPresetName.trim() || "Untitled Preset",
+              description: editPresetDescription.trim(),
+              labels: editSelectedPresetLabels,
+            }
+          : preset,
+      ),
+    );
+    setIsEditPresetOpen(false);
+    setEditingPresetId(null);
+    setEditPresetName("");
+    setEditPresetDescription("");
+    setEditPresetLabelQuery("");
+    setEditSelectedPresetLabels([]);
   };
 
   const handleOpenPresetDetails = (preset: Preset) => {
@@ -187,7 +218,7 @@ export default function ManagerPresetsPage({
           <button
             type="button"
             onClick={() => {
-              resetPresetForm();
+              resetCreatePresetForm();
               setIsCreatePresetOpen(true);
             }}
             className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
@@ -222,10 +253,11 @@ export default function ManagerPresetsPage({
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-gray-700">
-            Order by
-          </label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <label className="text-xs font-semibold text-gray-700">Order by</label>
+          <select
+            title="Order presets by"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>Name</option>
             <option>Date created</option>
             <option>Updated</option>
@@ -234,7 +266,10 @@ export default function ManagerPresetsPage({
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Order</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <select
+            title="Preset sort order"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>All</option>
             <option>Ascending</option>
             <option>Descending</option>
@@ -243,7 +278,10 @@ export default function ManagerPresetsPage({
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Status</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <select
+            title="Preset status"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>All</option>
             <option>Active</option>
             <option>Archived</option>
@@ -276,7 +314,7 @@ export default function ManagerPresetsPage({
             <button
               type="button"
               onClick={() => {
-                resetPresetForm();
+                resetCreatePresetForm();
                 setIsCreatePresetOpen(true);
               }}
               className="mt-5 flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
@@ -352,132 +390,6 @@ export default function ManagerPresetsPage({
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {!isAdmin && isEditPresetOpen && activePreset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-          <div
-            className={`w-full max-w-md rounded-lg border border-gray-300 bg-white shadow-xl ${
-              closingModals.editPreset ? "modal-pop-out" : "modal-pop"
-            }`}
-          >
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <h3 className="text-sm font-semibold text-gray-800">
-                Edit preset
-              </h3>
-              <button
-                type="button"
-                onClick={() =>
-                  closeWithAnimation("editPreset", setIsEditPresetOpen)
-                }
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Close"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M6 6l12 12" />
-                  <path d="M18 6l-12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form
-              onSubmit={handleUpdatePreset}
-              className="flex flex-col gap-4 p-4"
-            >
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">
-                  Preset name
-                </label>
-                <input
-                  value={presetName}
-                  onChange={(event) => setPresetName(event.target.value)}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="Example name"
-                  required
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">
-                  Preset description
-                </label>
-                <textarea
-                  value={presetDescription}
-                  onChange={(event) => setPresetDescription(event.target.value)}
-                  className="min-h-[100px] rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="Example description"
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-gray-700">
-                  Add labels
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    value={presetLabelQuery}
-                    onChange={(event) =>
-                      setPresetLabelQuery(event.target.value)
-                    }
-                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
-                    placeholder="Search labels to add..."
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddPresetLabel}
-                    className="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white"
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
-
-              <div className="rounded-md border border-gray-200 p-3">
-                <span className="text-xs font-semibold text-gray-700">
-                  Selected labels
-                </span>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {selectedPresetLabels.length === 0 && (
-                    <span className="text-xs text-gray-400">
-                      No labels selected
-                    </span>
-                  )}
-                  {selectedPresetLabels.map((label) => (
-                    <span
-                      key={label}
-                      className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
-                    >
-                      {label}
-                      <button
-                        type="button"
-                        onClick={() => handleRemovePresetLabel(label)}
-                        className="text-red-500 hover:text-red-600"
-                        aria-label={`Remove ${label}`}
-                      >
-                        x
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-                >
-                  Save changes
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
       )}
 
@@ -601,6 +513,128 @@ export default function ManagerPresetsPage({
                 >
                   <span className="text-base leading-none">+</span>
                   New Preset
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {!isAdmin && isEditPresetOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div
+            className={`w-full max-w-md rounded-lg border border-gray-300 bg-white shadow-xl ${
+              closingModals.editPreset ? "modal-pop-out" : "modal-pop"
+            }`}
+          >
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h3 className="text-sm font-semibold text-gray-800">Edit preset</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  closeWithAnimation("editPreset", setIsEditPresetOpen);
+                  resetEditPresetForm();
+                }}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M6 6l12 12" />
+                  <path d="M18 6l-12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdatePreset} className="flex flex-col gap-4 p-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-700">Preset name</label>
+                <input
+                  value={editPresetName}
+                  onChange={(event) => setEditPresetName(event.target.value)}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="Example name"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-700">
+                  Preset description
+                </label>
+                <textarea
+                  value={editPresetDescription}
+                  onChange={(event) => setEditPresetDescription(event.target.value)}
+                  className="min-h-[100px] rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="Example description"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-gray-700">Edit labels</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={editPresetLabelQuery}
+                    onChange={(event) => setEditPresetLabelQuery(event.target.value)}
+                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="Label name..."
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddEditPresetLabel}
+                    className="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-md border border-gray-200 p-3">
+                <span className="text-xs font-semibold text-gray-700">Selected labels</span>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {editSelectedPresetLabels.length === 0 && (
+                    <span className="text-xs text-gray-400">No labels selected</span>
+                  )}
+                  {editSelectedPresetLabels.map((label) => (
+                    <span
+                      key={label}
+                      className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
+                    >
+                      {label}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveEditPresetLabel(label)}
+                        className="text-red-500 hover:text-red-600"
+                        aria-label={`Remove ${label}`}
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeWithAnimation("editPreset", setIsEditPresetOpen);
+                    resetEditPresetForm();
+                  }}
+                  className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                >
+                  Save changes
                 </button>
               </div>
             </form>

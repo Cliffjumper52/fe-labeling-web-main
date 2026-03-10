@@ -361,8 +361,9 @@ export default function AnnotatorWorkspacePage() {
   const [resolvedUploadedImages, setResolvedUploadedImages] = useState<
     UploadedImage[]
   >(task.uploadedImages ?? []);
-  const isSubmitted =
-    task.status === "Pending Review" || task.status === "Completed";
+  const [isSubmitted, setIsSubmitted] = useState(
+    task.status === "Pending Review" || task.status === "Completed",
+  );
 
   const filteredLabels = useMemo(() => {
     const keyword = labelSearch.trim().toLowerCase();
@@ -415,6 +416,9 @@ export default function AnnotatorWorkspacePage() {
     setRound3SubmittedByLabel({});
     setRound3DraftChecklistByLabel({});
     setResolvedUploadedImages(task.uploadedImages ?? []);
+    setIsSubmitted(
+      task.status === "Pending Review" || task.status === "Completed",
+    );
   }, [task]);
 
   useEffect(() => {
@@ -454,28 +458,19 @@ export default function AnnotatorWorkspacePage() {
     if (activeRound?.id !== "round-3" || !selectedLabel) {
       return;
     }
-
-    if (round3SubmittedByLabel[selectedLabel]) {
-      return;
-    }
-
     setRound3DraftChecklistByLabel((prev) => {
       if (prev[selectedLabel]) {
         return prev;
       }
 
-      return {
-        ...prev,
-        [selectedLabel]: buildChecklistForLabel(
-          selectedLabel,
-          task.checklist,
-        ).map((item) => ({
-          item,
-          checked: false,
-        })),
-      };
+      const nextChecklist = buildChecklistForLabel(
+        selectedLabel,
+        task.checklist,
+      ).map((item) => ({ item, checked: false }));
+
+      return { ...prev, [selectedLabel]: nextChecklist };
     });
-  }, [activeRound?.id, round3SubmittedByLabel, selectedLabel, task.checklist]);
+  }, [activeRound?.id, selectedLabel, task.checklist]);
 
   const handleToggleRound3DraftChecklist = (index: number) => {
     if (!selectedLabel) {
@@ -483,42 +478,42 @@ export default function AnnotatorWorkspacePage() {
     }
 
     setRound3DraftChecklistByLabel((prev) => {
-      const current = prev[selectedLabel] ?? [];
-      if (!current[index]) {
+      const current = prev[selectedLabel];
+      if (!current) {
         return prev;
       }
 
-      return {
-        ...prev,
-        [selectedLabel]: current.map((item, idx) =>
-          idx === index ? { ...item, checked: !item.checked } : item,
-        ),
-      };
+      const next = current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, checked: !item.checked } : item,
+      );
+
+      return { ...prev, [selectedLabel]: next };
     });
   };
 
   const handleRound3Submit = () => {
-    if (!selectedLabel || activeRound?.id !== "round-3") {
+    if (!selectedLabel) {
       return;
     }
 
-    const checklist =
-      round3DraftChecklistByLabel[selectedLabel] ??
-      buildChecklistForLabel(selectedLabel, task.checklist).map((item) => ({
-        item,
-        checked: false,
-      }));
+    const draft = round3DraftChecklistByLabel[selectedLabel] ?? [];
+    if (draft.length === 0) {
+      return;
+    }
+
+    const submittedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
 
     setRound3SubmittedByLabel((prev) => ({
       ...prev,
       [selectedLabel]: {
-        id: `round-3-submitted-${Date.now()}`,
-        title: "Submitted v1",
+        id: `submitted-round3-${selectedLabel}`,
+        title: "Submitted v3",
         answerBy: "Annotator",
-        submittedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
-        checklist,
+        submittedAt,
+        checklist: draft,
       },
     }));
+    setIsSubmitted(true);
   };
 
   return (
