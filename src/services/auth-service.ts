@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 import api from "../api/axios";
+=======
+import api, { refreshApi } from "../api/axios";
+>>>>>>> Stashed changes
 
 export const login = async (username: string, password: string) => {
   try {
@@ -41,7 +45,12 @@ export const login = async (username: string, password: string) => {
         },
       } as any;
     }
+<<<<<<< Updated upstream
     const resp = await api.post("/auth/login", { username, password });
+=======
+    
+    const resp = await api.post("/auth/login", { email: username, password });
+>>>>>>> Stashed changes
     return resp;
   } catch (error) {
     // If backend is not configured (local dev), return a mocked success response
@@ -58,3 +67,50 @@ export const login = async (username: string, password: string) => {
     throw error;
   }
 };
+<<<<<<< Updated upstream
+=======
+
+export const getInfoByToken = async () => {
+  try {
+    const resp = await api.get("/auth/me");
+    return resp;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updatePassword = async (
+  id: string,
+  currentPassword: string,
+  newPassword: string,
+) => {
+  try {
+    const resp = await api.patch(`/auth/update-password/${id}`, {
+      currentPassword,
+      newPassword,
+    });
+    return resp;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const resetPassword = async (email: string) => {
+  try {
+    const resp = await api.patch("/auth/reset-password", { email });
+    return resp;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const refreshToken = async () => {
+  try {
+    // Intentional: avoid recursive interceptor handling by using refreshApi directly.
+    const resp = refreshApi.post("/auth/refresh", {});
+    return resp;
+  } catch (error) {
+    throw error;
+  }
+};
+>>>>>>> Stashed changes

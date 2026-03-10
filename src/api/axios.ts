@@ -1,4 +1,8 @@
 import axios from "axios";
+<<<<<<< Updated upstream
+=======
+import { refreshToken } from "../services/auth-service";
+>>>>>>> Stashed changes
 
 const api = axios.create({
   baseURL: `${import.meta.env.VITE_PUBLIC_BACKEND_URL}
