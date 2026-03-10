@@ -3,34 +3,37 @@ import { login } from "../../services/auth-service.service";
 import LoginForm from "../../components/login/login-form";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import { useAuth } from "../../context/auth-context.context";
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { setAuthTokens, setUserInfo, getUserInfo } = useAuth();
 
   const handleLogin = async (email: string, password: string) => {
-    console.log(email, password);
+    // console.log(email, password);
     setIsLoading(true);
     try {
       const result = await login(email, password);
       const accessToken = result?.data?.accessToken;
       const refreshToken = result?.data?.refreshToken;
-      const role = result?.data?.user?.role;
-      const username = result?.data?.user?.username ?? email;
-      if (accessToken) localStorage.setItem("accessToken", accessToken);
 
-      if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
-      localStorage.setItem("currentUserName", username);
-      if (role) localStorage.setItem("currentUserRole", role);
+      setAuthTokens(accessToken, refreshToken);
+      await setUserInfo();
+
+      const userInfo = getUserInfo();
+      const role = userInfo?.role;
+
       toast.success("Login successful");
+      // const role = info?.data?.user?.role;
+
       if (role === "admin") {
         navigate("/admin");
       } else if (role === "manager") {
         navigate("/manager");
+      } else if (role === "annotator") {
+        navigate("/annotator");
       } else if (role === "reviewer") {
         navigate("/reviewer");
-      } else {
-        navigate("/annotator");
       }
     } catch (error) {
       console.log(error);
