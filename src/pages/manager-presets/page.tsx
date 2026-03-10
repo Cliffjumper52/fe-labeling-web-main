@@ -179,7 +179,11 @@ export default function ManagerPresetsPage({
       ),
     );
     setIsEditPresetOpen(false);
-    resetEditPresetForm();
+    setEditingPresetId(null);
+    setEditPresetName("");
+    setEditPresetDescription("");
+    setEditPresetLabelQuery("");
+    setEditSelectedPresetLabels([]);
   };
 
   const handleOpenPresetDetails = (preset: Preset) => {

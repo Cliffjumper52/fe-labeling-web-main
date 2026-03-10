@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { login } from "../../services/auth-service";
+import { login } from "../../services/auth-service.service";
 import LoginForm from "../../components/login/login-form";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -9,6 +9,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   const handleLogin = async (email: string, password: string) => {
+    console.log(email, password);
     setIsLoading(true);
     try {
       const result = await login(email, password);
@@ -17,6 +18,7 @@ export default function LoginPage() {
       const role = result?.data?.user?.role;
       const username = result?.data?.user?.username ?? email;
       if (accessToken) localStorage.setItem("accessToken", accessToken);
+
       if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
       localStorage.setItem("currentUserName", username);
       if (role) localStorage.setItem("currentUserRole", role);
@@ -31,6 +33,7 @@ export default function LoginPage() {
         navigate("/annotator");
       }
     } catch (error) {
+      console.log(error);
       toast.error("Login failed");
     } finally {
       setIsLoading(false);
@@ -50,8 +53,8 @@ export default function LoginPage() {
             <div>
               <h2>Enterprise-grade labeling operations</h2>
               <p>
-                Track projects, label taxonomies, and preset templates across teams
-                in a single control room designed for scale.
+                Track projects, label taxonomies, and preset templates across
+                teams in a single control room designed for scale.
               </p>
             </div>
 
@@ -82,8 +85,8 @@ export default function LoginPage() {
             </div>
 
             <p>
-              Signed-in roles automatically route to admin, manager, or annotator
-              workspaces.
+              Signed-in roles automatically route to admin, manager, or
+              annotator workspaces.
             </p>
           </aside>
 
@@ -96,7 +99,8 @@ export default function LoginPage() {
               <LoginForm onLogin={handleLogin} isLoading={isLoading} />
 
               <div className="login-demo-hint">
-                Demo: admin@gmail.com / manager@gmail.com / annotator@gmail.com / reviewer@gmail.com (password: 123)
+                Demo: admin@gmail.com / manager@gmail.com / annotator@gmail.com
+                / reviewer@gmail.com (password: 123)
               </div>
             </div>
 

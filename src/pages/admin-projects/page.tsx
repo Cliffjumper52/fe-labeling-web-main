@@ -1,4 +1,7 @@
+import { useMemo } from "react";
 import ManagerProjectsPage from "../manager-projects/page";
+
+const MANAGER_PROJECTS_STORAGE_KEY = "manager-projects";
 
 export default function AdminProjectsPage() {
   const sampleProjects: {
@@ -8,6 +11,12 @@ export default function AdminProjectsPage() {
     status: "Active" | "Drafting" | "Archived";
     dataType: "Image" | "Video" | "Text" | "Audio";
     createdAt: string;
+    uploadedFiles?: string[];
+    selectedPreset?: { id: string; name: string } | null;
+    assignedAnnotatorIds?: string[];
+    assignedReviewerIds?: string[];
+    annotatorFileAssignments?: Record<string, string[]>;
+    reviewerFileAssignments?: Record<string, string[]>;
   }[] = [
     {
       id: "proj-1",
@@ -35,5 +44,26 @@ export default function AdminProjectsPage() {
     },
   ];
 
-  return <ManagerProjectsPage mode="admin" initialProjects={sampleProjects} />;
+  const initialProjects = useMemo(() => {
+    if (typeof window === "undefined") {
+      return sampleProjects;
+    }
+
+    const raw = localStorage.getItem(MANAGER_PROJECTS_STORAGE_KEY);
+    if (!raw) {
+      return sampleProjects;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as typeof sampleProjects;
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        return sampleProjects;
+      }
+      return parsed;
+    } catch {
+      return sampleProjects;
+    }
+  }, [sampleProjects]);
+
+  return <ManagerProjectsPage mode="admin" initialProjects={initialProjects} />;
 }

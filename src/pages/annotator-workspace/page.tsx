@@ -361,8 +361,9 @@ export default function AnnotatorWorkspacePage() {
   const [resolvedUploadedImages, setResolvedUploadedImages] = useState<
     UploadedImage[]
   >(task.uploadedImages ?? []);
-  const isSubmitted =
-    task.status === "Pending Review" || task.status === "Completed";
+  const [isSubmitted, setIsSubmitted] = useState(
+    task.status === "Pending Review" || task.status === "Completed",
+  );
 
   const filteredLabels = useMemo(() => {
     const keyword = labelSearch.trim().toLowerCase();
@@ -415,6 +416,9 @@ export default function AnnotatorWorkspacePage() {
     setRound3SubmittedByLabel({});
     setRound3DraftChecklistByLabel({});
     setResolvedUploadedImages(task.uploadedImages ?? []);
+    setIsSubmitted(
+      task.status === "Pending Review" || task.status === "Completed",
+    );
   }, [task]);
 
   useEffect(() => {
@@ -454,51 +458,62 @@ export default function AnnotatorWorkspacePage() {
     if (activeRound?.id !== "round-3" || !selectedLabel) {
       return;
     }
-    setCustomLabels((prev) => [...prev, trimmed]);
-    setNewLabel("");
-  };
-
-  const handleSubmit = () => {
-    setShowSubmitConfirm(true);
-  };
-
-  const handleConfirmSubmit = () => {
-    if (typeof window !== "undefined") {
-      const raw = localStorage.getItem(ANNOTATOR_TASKS_STORAGE_KEY);
-
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
-          const submittedAt = new Date().toISOString().slice(0, 10);
-
-          const updated = parsed.map((item) => {
-            if (String(item.id) !== task.id) {
-              return item;
-            }
-
-            return {
-              ...item,
-              status: "Pending Review",
-              progress: 100,
-              submittedAt,
-              submittedImages: task.uploadedImages ?? [],
-              qaDecision: undefined,
-              qaReviewedAt: undefined,
-              errorTypes: [],
-              reviewerNote: "",
-            };
-          });
-
-          localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(updated));
-          window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
-        } catch {
-          // ignore malformed local data and keep UI submission state
-        }
+    setRound3DraftChecklistByLabel((prev) => {
+      if (prev[selectedLabel]) {
+        return prev;
       }
+
+      const nextChecklist = buildChecklistForLabel(
+        selectedLabel,
+        task.checklist,
+      ).map((item) => ({ item, checked: false }));
+
+      return { ...prev, [selectedLabel]: nextChecklist };
+    });
+  }, [activeRound?.id, selectedLabel, task.checklist]);
+
+  const handleToggleRound3DraftChecklist = (index: number) => {
+    if (!selectedLabel) {
+      return;
     }
 
+    setRound3DraftChecklistByLabel((prev) => {
+      const current = prev[selectedLabel];
+      if (!current) {
+        return prev;
+      }
+
+      const next = current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, checked: !item.checked } : item,
+      );
+
+      return { ...prev, [selectedLabel]: next };
+    });
+  };
+
+  const handleRound3Submit = () => {
+    if (!selectedLabel) {
+      return;
+    }
+
+    const draft = round3DraftChecklistByLabel[selectedLabel] ?? [];
+    if (draft.length === 0) {
+      return;
+    }
+
+    const submittedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
+
+    setRound3SubmittedByLabel((prev) => ({
+      ...prev,
+      [selectedLabel]: {
+        id: `submitted-round3-${selectedLabel}`,
+        title: "Submitted v3",
+        answerBy: "Annotator",
+        submittedAt,
+        checklist: draft,
+      },
+    }));
     setIsSubmitted(true);
-    setShowSubmitConfirm(false);
   };
 
   return (

@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -8,6 +9,7 @@ import {
   type MouseEvent,
   type SetStateAction,
 } from "react";
+import { Link } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { saveFilesToImageStore, type StoredImageRef } from "../../utils/image-store";
@@ -19,6 +21,12 @@ type Project = {
   status: "Drafting" | "Active" | "Archived";
   dataType: "Image" | "Video" | "Text" | "Audio";
   createdAt: string;
+  uploadedFiles?: string[];
+  selectedPreset?: Preset | null;
+  assignedAnnotatorIds?: string[];
+  assignedReviewerIds?: string[];
+  annotatorFileAssignments?: Record<string, string[]>;
+  reviewerFileAssignments?: Record<string, string[]>;
 };
 
 type Preset = {
@@ -276,6 +284,16 @@ export default function ManagerProjectsPage({
   const [reviewerFileAssignments, setReviewerFileAssignments] = useState<
     Record<string, string[]>
   >({});
+  const assignedReviewerIds = useMemo(() => {
+    const ids = new Set<string>();
+    Object.values(reviewerFileAssignments).forEach((assigned) => {
+      assigned.forEach((id) => ids.add(id));
+    });
+    if (selectedReviewerId) {
+      ids.add(selectedReviewerId);
+    }
+    return Array.from(ids);
+  }, [reviewerFileAssignments, selectedReviewerId]);
   const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
   const [presetSearch, setPresetSearch] = useState("");
   const [annotators, setAnnotators] = useState<TeamMember[]>(() =>
@@ -287,6 +305,16 @@ export default function ManagerProjectsPage({
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
+  const assignedAnnotatorIds = useMemo(() => {
+    const ids = new Set<string>();
+    Object.values(annotatorFileAssignments).forEach((assigned) => {
+      assigned.forEach((id) => ids.add(id));
+    });
+    if (selectedAnnotatorId) {
+      ids.add(selectedAnnotatorId);
+    }
+    return Array.from(ids);
+  }, [annotatorFileAssignments, selectedAnnotatorId]);
 
   const handleCreate = (event: FormEvent) => {
     event.preventDefault();
@@ -314,14 +342,16 @@ export default function ManagerProjectsPage({
     setEditProjectName(project.name);
     setEditProjectDescription(project.description ?? "");
     setEditProjectDataType(project.dataType);
-    setSelectedAnnotatorId(null);
-    setSelectedReviewerId(null);
+    const annotatorIds = project.assignedAnnotatorIds ?? [];
+    const reviewerIds = project.assignedReviewerIds ?? [];
+    setSelectedAnnotatorId(annotatorIds.length === 1 ? annotatorIds[0] : null);
+    setSelectedReviewerId(reviewerIds.length === 1 ? reviewerIds[0] : null);
     setSelectedAnnotatorFiles([]);
     setSelectedReviewerFiles([]);
-    setAnnotatorFileAssignments({});
-    setReviewerFileAssignments({});
-    setSelectedPreset(null);
-    setUploadedFiles([]);
+    setAnnotatorFileAssignments(project.annotatorFileAssignments ?? {});
+    setReviewerFileAssignments(project.reviewerFileAssignments ?? {});
+    setSelectedPreset(project.selectedPreset ?? null);
+    setUploadedFiles(project.uploadedFiles ?? []);
     setUploadedImages([]);
     setUploadedImageFiles([]);
     setIsEditOpen(true);
@@ -423,6 +453,12 @@ export default function ManagerProjectsPage({
               description: nextDescription,
               dataType: editProjectDataType,
               status,
+              uploadedFiles,
+              selectedPreset,
+              assignedAnnotatorIds,
+              assignedReviewerIds,
+              annotatorFileAssignments,
+              reviewerFileAssignments,
             }
           : project,
       ),
@@ -435,6 +471,12 @@ export default function ManagerProjectsPage({
             description: nextDescription,
             dataType: editProjectDataType,
             status,
+            uploadedFiles,
+            selectedPreset,
+            assignedAnnotatorIds,
+            assignedReviewerIds,
+            annotatorFileAssignments,
+            reviewerFileAssignments,
           }
         : prev,
     );
@@ -446,6 +488,12 @@ export default function ManagerProjectsPage({
             description: nextDescription,
             dataType: editProjectDataType,
             status,
+            uploadedFiles,
+            selectedPreset,
+            assignedAnnotatorIds,
+            assignedReviewerIds,
+            annotatorFileAssignments,
+            reviewerFileAssignments,
           }
         : prev,
     );
@@ -462,11 +510,11 @@ export default function ManagerProjectsPage({
     }
     const assignedNames = resolveNames(
       annotators,
-      selectedAnnotatorId ? [selectedAnnotatorId] : [],
+      assignedAnnotatorIds,
     );
     const reviewerNames = resolveNames(
       reviewers,
-      selectedReviewerId ? [selectedReviewerId] : [],
+      assignedReviewerIds,
     );
     const today = new Date();
     const dueDate = new Date(today);
@@ -502,6 +550,8 @@ export default function ManagerProjectsPage({
       labels: selectedPreset?.labels ?? ["Label A", "Label B"],
       assignedAnnotators: assignedNames,
       assignedReviewers: reviewerNames,
+      assignedAnnotatorIds,
+      assignedReviewerIds,
       annotatorAssignmentsByFile: annotatorFileAssignments,
       reviewerAssignmentsByFile: reviewerFileAssignments,
       uploadedImageRefs,
@@ -867,13 +917,12 @@ export default function ManagerProjectsPage({
                     Delete
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEdit(project)}
+                  <Link
+                    to={`/manager/projects/${project.id}`}
                     className="text-blue-600 hover:text-blue-700"
                   >
                     Edit
-                  </button>
+                  </Link>
                 )}
               </div>
             </div>
@@ -1021,14 +1070,15 @@ export default function ManagerProjectsPage({
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-md border border-gray-200 p-3">
                   <p className="text-xs font-semibold text-gray-700">
-                    Assigned Annotator
+                    Assigned Annotators
                   </p>
                   <p className="mt-2 text-sm text-gray-800">
-                    {!selectedAnnotatorId
+                    {(detailProject.assignedAnnotatorIds ?? []).length === 0
                       ? "Unassigned"
-                      : resolveNames(annotators, [selectedAnnotatorId]).join(
-                          ", ",
-                        )}
+                      : resolveNames(
+                          annotators,
+                          detailProject.assignedAnnotatorIds ?? [],
+                        ).join(", ")}
                   </p>
                 </div>
                 <div className="rounded-md border border-gray-200 p-3">
@@ -1036,9 +1086,12 @@ export default function ManagerProjectsPage({
                     Assigned Reviewer
                   </p>
                   <p className="mt-2 text-sm text-gray-800">
-                    {!selectedReviewerId
+                    {(detailProject.assignedReviewerIds ?? []).length === 0
                       ? "Unassigned"
-                      : resolveNames(reviewers, [selectedReviewerId]).join(", ")}
+                      : resolveNames(
+                          reviewers,
+                          detailProject.assignedReviewerIds ?? [],
+                        ).join(", ")}
                   </p>
                 </div>
                 <div className="rounded-md border border-gray-200 p-3">
@@ -1046,16 +1099,17 @@ export default function ManagerProjectsPage({
                     Selected Preset
                   </p>
                   <p className="mt-2 text-sm text-gray-800">
-                    {selectedPreset?.name || "No preset selected"}
+                    {detailProject.selectedPreset?.name ||
+                      "No preset selected"}
                   </p>
                 </div>
                 <div className="rounded-md border border-gray-200 p-3">
                   <p className="text-xs font-semibold text-gray-700">Uploaded files</p>
-                  {uploadedFiles.length === 0 ? (
+                  {(detailProject.uploadedFiles ?? []).length === 0 ? (
                     <p className="mt-2 text-xs text-gray-400">No images uploaded</p>
                   ) : (
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {uploadedFiles.map((file) => (
+                      {(detailProject.uploadedFiles ?? []).map((file) => (
                         <span
                           key={file}
                           className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
@@ -1305,13 +1359,13 @@ export default function ManagerProjectsPage({
                         </div>
                       )
                     ) : section.id === "annotators" ? (
-                      !selectedAnnotatorId ? (
+                      assignedAnnotatorIds.length === 0 ? (
                         <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
                           {section.empty}
                         </div>
                       ) : (
                         <div className="mt-2 flex flex-wrap gap-2">
-                          {resolveNames(annotators, [selectedAnnotatorId]).map(
+                          {resolveNames(annotators, assignedAnnotatorIds).map(
                             (name) => (
                               <span
                                 key={name}

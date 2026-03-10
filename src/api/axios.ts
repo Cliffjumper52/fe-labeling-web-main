@@ -1,10 +1,15 @@
 import axios from "axios";
+import { refreshToken } from "../services/auth-service.service";
 
+import Cookies from "js-cookie";
 const api = axios.create({
-  baseURL: `${import.meta.env.VITE_PUBLIC_BACKEND_URL}
-  /${import.meta.env.VITE_PUBLIC_BACKEND_PREFIX}
-  /${import.meta.env.VITE_PUBLIC_BACKEND_VERSION}`,
+  baseURL: `${import.meta.env.VITE_PUBLIC_BACKEND_URL}/${import.meta.env.VITE_PUBLIC_BACKEND_PREFIX}/${import.meta.env.VITE_PUBLIC_BACKEND_VERSION}`,
   withCredentials: true, //use cookies token
+});
+
+const refreshApi = axios.create({
+  baseURL: `${import.meta.env.VITE_PUBLIC_BACKEND_URL}/${import.meta.env.VITE_PUBLIC_BACKEND_PREFIX}/${import.meta.env.VITE_PUBLIC_BACKEND_VERSION}`,
+  withCredentials: true,
 });
 
 // Request Interceptor
@@ -16,7 +21,7 @@ api.interceptors.request.use(
 // Response Interceptor
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     console.log("API Error:", {
       status: error.response?.status,
       statusText: error.response?.statusText,
@@ -28,8 +33,13 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401) {
       try {
-        // Attempt to refresh token, implement later
-        throw new Error("Token refresh not implemented");
+        const result = await refreshToken();
+        const resultData = result?.data;
+        const newAccessToken = resultData?.accessToken;
+        const newRefreshToken = resultData?.refreshToken;
+
+        if (newAccessToken) Cookies.set("accessToken", newAccessToken);
+        if (newRefreshToken) Cookies.set("refreshToken", newRefreshToken);
       } catch (error) {
         // Handle token refresh failure (e.g., redirect to login);
         window.location.href = "/login";
@@ -40,3 +50,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+export { refreshApi };
