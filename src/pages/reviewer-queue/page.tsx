@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
 
 type TaskStatus = "In Progress" | "Pending Review" | "Returned" | "Completed";
 type Severity = "Low" | "Medium" | "High";
@@ -111,13 +112,9 @@ const scoreFromSeverity = (severity: Severity) => {
 export default function ReviewerQueuePage() {
   const [tasks, setTasks] = useState<ReviewTask[]>(() => loadTasks());
   const [search, setSearch] = useState("");
-<<<<<<< Updated upstream
-  const [statusFilter, setStatusFilter] = useState<TaskStatus | "All">("Pending Review");
-=======
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "All">(
     "Pending Review",
   );
->>>>>>> Stashed changes
   const [activeTask, setActiveTask] = useState<ReviewTask | null>(null);
   const [isInspectOpen, setIsInspectOpen] = useState(false);
   const [decision, setDecision] = useState<"Approved" | "Rejected">("Approved");
@@ -215,16 +212,6 @@ export default function ReviewerQueuePage() {
         ? prev.filter((item) => item !== errorType)
         : [...prev, errorType],
     );
-  };
-
-  const handleOpenInspect = (task: ReviewTask) => {
-    setActiveTask(task);
-    setDecision(task.qaDecision ?? "Approved");
-    setSeverity(task.severity ?? "Low");
-    setErrorTypes(task.errorTypes ?? []);
-    setReviewComment(task.reviewerNote ?? "");
-    setActiveReviewImageIndex(0);
-    setIsInspectOpen(true);
   };
 
   const applyDecision = () => {
@@ -328,15 +315,6 @@ export default function ReviewerQueuePage() {
         </div>
       </div>
 
-<<<<<<< Updated upstream
-      <div className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="grid grid-cols-[1.7fr_1.4fr_0.9fr_0.9fr_1.2fr] items-center gap-2 border-b bg-gray-50 px-4 py-3 text-xs font-semibold uppercase text-gray-600">
-          <span>Project</span>
-          <span>Dataset</span>
-          <span>Status</span>
-          <span>Annotator</span>
-          <span>Action</span>
-=======
       <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <div className="min-w-[860px]">
@@ -392,44 +370,7 @@ export default function ReviewerQueuePage() {
               </div>
             ))}
           </div>
->>>>>>> Stashed changes
         </div>
-
-        {filteredTasks.map((task) => (
-          <div
-            key={task.id}
-            className="grid grid-cols-[1.7fr_1.4fr_0.9fr_0.9fr_1.2fr] items-center gap-2 border-b px-4 py-3 text-sm last:border-b-0"
-          >
-            <div>
-              <p className="font-semibold text-gray-800">{task.projectName}</p>
-              <p className="text-xs text-gray-500">Due {task.dueAt}</p>
-            </div>
-            <p className="text-gray-600">{task.dataset}</p>
-            <span
-              className={`w-fit rounded-md px-3 py-1 text-xs font-semibold ${
-                task.status === "Pending Review"
-                  ? "bg-amber-100 text-amber-700"
-                  : task.status === "Completed"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-rose-100 text-rose-700"
-              }`}
-            >
-              {task.status}
-            </span>
-            <p className="text-xs text-gray-600">
-              {task.assignedAnnotators?.join(", ") || "Unassigned"}
-            </p>
-            <div className="flex items-center gap-3 text-sm font-semibold">
-              <button
-                type="button"
-                onClick={() => handleOpenInspect(task)}
-                className="text-blue-600 hover:text-blue-700"
-              >
-                Inspect
-              </button>
-            </div>
-          </div>
-        ))}
       </div>
 
       {isInspectOpen && activeTask && createPortal(

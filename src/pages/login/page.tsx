@@ -14,7 +14,7 @@ export default function LoginPage() {
       const result = await login(email, password);
       const accessToken = result?.data?.accessToken;
       const refreshToken = result?.data?.refreshToken;
-      const role = result?.data?.user?.role;
+      const role = result?.data?.user?.role ?? result?.data?.role;
       if (accessToken) localStorage.setItem("accessToken", accessToken);
       if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
       toast.success("Login successful");

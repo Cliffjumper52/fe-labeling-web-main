@@ -118,13 +118,10 @@ export const router: RouterItem[] = [
       {
         path: "queue",
         Component: React.lazy(() => import("../pages/reviewer-queue/page")),
-<<<<<<< Updated upstream
-=======
       },
       {
         path: "workspace/:id",
         Component: React.lazy(() => import("../pages/reviewer-workspace/page")),
->>>>>>> Stashed changes
       },
       {
         path: "reports",

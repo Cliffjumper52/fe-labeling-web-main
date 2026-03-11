@@ -1,13 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-<<<<<<< Updated upstream
-=======
-import {
-  loadImagesFromStore,
-  type StoredImageRef,
-} from "../../utils/image-store";
-import { toast } from "sonner";
->>>>>>> Stashed changes
 
 const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
 const ANNOTATOR_TASKS_UPDATED_EVENT = "annotator-tasks-updated";
@@ -28,12 +20,8 @@ type WorkspaceTask = {
   instructions: string[];
   checklist: string[];
   labels: string[];
-<<<<<<< Updated upstream
-=======
-  status?: "In Progress" | "Pending Review" | "Returned" | "Completed";
   reviewerNote?: string;
   errorTypes?: string[];
->>>>>>> Stashed changes
   uploadedImages?: UploadedImage[];
 };
 
@@ -220,7 +208,6 @@ export default function AnnotatorWorkspacePage() {
     setShowSubmitConfirm(true);
   };
 
-<<<<<<< Updated upstream
   const handleConfirmSubmit = () => {
     const normalizedLabels = Array.from(
       new Set(
@@ -268,85 +255,6 @@ export default function AnnotatorWorkspacePage() {
 
     setIsSubmitted(true);
     setShowSubmitConfirm(false);
-=======
-    setRound3SubmittedByLabel((prev) => ({
-      ...prev,
-      [selectedLabel]: {
-        id: `round-3-submitted-${Date.now()}`,
-        title: "Submitted v1",
-        answerBy: "Annotator",
-        submittedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
-        checklist,
-      },
-    }));
-
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const raw = localStorage.getItem(ANNOTATOR_TASKS_STORAGE_KEY);
-    if (!raw) {
-      toast.error("Task storage not found. Please ask manager to assign again.");
-      return;
-    }
-
-    try {
-      const tasks = JSON.parse(raw) as Array<Record<string, unknown>>;
-      if (!Array.isArray(tasks)) {
-        toast.error("Task data is invalid.");
-        return;
-      }
-
-      let found = false;
-      const next = tasks.map((item) => {
-        if (String(item.id) !== String(task.id)) {
-          return item;
-        }
-
-        found = true;
-        return {
-          ...item,
-          status: "Pending Review",
-          progress: 100,
-          labels: customLabels,
-          submittedLabels: customLabels,
-          submittedImages: resolvedUploadedImages,
-          submittedImageRefs: task.uploadedImageRefs ?? [],
-          submittedAt: new Date().toISOString(),
-        };
-      });
-
-      if (!found) {
-        next.unshift({
-          id: task.id,
-          projectName: task.projectName,
-          dataset: task.dataset,
-          priority: "Normal",
-          status: "Pending Review",
-          assignedAt: new Date().toISOString().slice(0, 10),
-          dueAt: new Date().toISOString().slice(0, 10),
-          aiPrelabel: task.aiPrelabel,
-          preset: task.preset,
-          progress: 100,
-          instructions: task.instructions,
-          checklist: task.checklist,
-          labels: customLabels,
-          submittedLabels: customLabels,
-          uploadedImages: task.uploadedImages ?? [],
-          uploadedImageRefs: task.uploadedImageRefs ?? [],
-          submittedImages: resolvedUploadedImages,
-          submittedImageRefs: task.uploadedImageRefs ?? [],
-          submittedAt: new Date().toISOString(),
-        });
-      }
-
-      localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(next));
-      window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
-      toast.success("Submitted to reviewer queue.");
-    } catch {
-      toast.error("Submit failed. Please try again.");
-    }
->>>>>>> Stashed changes
   };
 
   return (
