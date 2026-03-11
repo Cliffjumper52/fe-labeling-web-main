@@ -31,6 +31,10 @@ export const router: RouterItem[] = [
         ),
       },
       {
+        path: "ratings",
+        Component: React.lazy(() => import("../pages/annotator-ratings/page")),
+      },
+      {
         path: "workspace/:id",
         Component: React.lazy(
           () => import("../pages/annotator-workspace/page"),
@@ -118,8 +122,14 @@ export const router: RouterItem[] = [
         Component: React.lazy(() => import("../pages/reviewer-workspace/page")),
       },
       {
-        path: "reports",
+        path: "reviews",
         Component: React.lazy(() => import("../pages/reviewer-reports/page")),
+      },
+      {
+        path: "review-error-types",
+        Component: React.lazy(
+          () => import("../pages/reviewer-review-error-types/page"),
+        ),
       },
     ],
   },

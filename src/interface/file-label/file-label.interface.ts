@@ -1,4 +1,5 @@
 import type { FileLabelStatus } from "../enums/domain.enums";
+import type { ChecklistAnswer } from "../checklist-answer/checklist-answer.interface";
 import type {
   BaseEntityModel,
   EntityReference,
@@ -15,5 +16,5 @@ export interface FileLabel extends BaseEntityModel {
   reviewerId: string | null;
   reviewer?: EntityReference | null;
   status: FileLabelStatus;
-  checklistAnswers?: EntityReference[];
+  checklistAnswers?: Array<EntityReference | ChecklistAnswer>;
 }

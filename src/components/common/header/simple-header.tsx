@@ -4,35 +4,31 @@ import { useAuth } from "../../../context/auth-context.context";
 
 export default function SimpleHeader() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, getUserInfo } = useAuth();
   const todayLabel = new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
   }).format(new Date());
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [displayName, setDisplayName] = useState("Admin");
-  const [displayRole, setDisplayRole] = useState("Admin");
+  const [displayName, setDisplayName] = useState("User");
+  const [displayRole, setDisplayRole] = useState("User");
   const location = useLocation();
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    const storedName = localStorage.getItem("currentUserName");
-    const storedRole = localStorage.getItem("currentUserRole");
-    if (storedName) {
-      setDisplayName(storedName);
-    }
-    if (storedRole) {
-      setDisplayRole(storedRole);
-    }
-  }, []);
+  const formatRoleLabel = (role: string) =>
+    role.charAt(0).toUpperCase() + role.slice(1);
 
   useEffect(() => {
+    const userInfo = getUserInfo();
+    if (userInfo) {
+      setDisplayName(userInfo.username || userInfo.email || "User");
+      setDisplayRole(formatRoleLabel(userInfo.role));
+      return;
+    }
+
     const roleFromPath = location.pathname.split("/")[1];
     if (roleFromPath) {
-      setDisplayRole(roleFromPath);
+      setDisplayRole(formatRoleLabel(roleFromPath));
     }
-  }, [location.pathname]);
+  }, [getUserInfo, location.pathname]);
 
   const handleLogout = () => {
     logout();

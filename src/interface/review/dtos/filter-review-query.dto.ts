@@ -1,4 +1,4 @@
-import { BasePaginationQueryDto } from '../../common/base-pagination-query.dto';
+import type { BasePaginationQueryDto } from '../../common/base-pagination-query.dto';
 import { Decision } from '../enums/decisions.enums';
 
 export interface FilterReviewQueryDto extends BasePaginationQueryDto {
