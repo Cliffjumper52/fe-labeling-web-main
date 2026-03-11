@@ -6,7 +6,7 @@ const adminActions = [
   { label: "Projects", to: "/admin/projects" },
   { label: "Labels", to: "/admin/labels" },
   { label: "Presets", to: "/admin/presets" },
-  // { label: "Categories", to: "/admin/categories" },
+  // { label: "Categories", to: "/admin/categories" }, //neu lam kip thi lam luon
 ];
 
 export default function AdminSidebar() {

@@ -96,3 +96,30 @@ export const restoreLabel = async (id: string) => {
     throw error;
   }
 };
+
+export const getAllowedLabelsInProject = async (
+  projectId: string,
+  filter: FilterLabelQueryDto,
+  includeDeleted: boolean = false,
+) => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (filter.search) queryParams.append("search", filter.search);
+    if (filter.searchBy) queryParams.append("searchBy", filter.searchBy);
+    if (filter.orderBy) queryParams.append("orderBy", filter.orderBy);
+    if (filter.page) queryParams.append("page", filter.page.toString());
+    if (filter.limit) queryParams.append("limit", filter.limit.toString());
+    if (filter.order) queryParams.append("order", filter.order);
+    if (filter.categoryIds)
+      filter.categoryIds.forEach((id) => queryParams.append("categoryIds", id));
+    if (includeDeleted)
+      queryParams.append("includeDeleted", includeDeleted.toString());
+
+    const resp = await api.get(
+      `/labels/projects/${projectId}?${queryParams.toString()}`,
+    );
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};

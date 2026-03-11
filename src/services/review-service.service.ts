@@ -36,6 +36,15 @@ export interface SubmitReviewsDto {
   fileLabelId: string;
 }
 
+export interface ReviewerAggregationStats {
+  reviewerId: string;
+  approved: number;
+  rejected: number;
+  totalReviewed: number;
+  approvalRate: number;
+  scoreImpact: number;
+}
+
 export const updateReview = async (id: string, dto: UpdateReviewDto) => {
   try {
     const resp = await api.patch(`/reviews/${id}`, dto);
@@ -132,6 +141,20 @@ export const getReviewById = async (
 export const submitReviews = async (dto: SubmitReviewsDto) => {
   try {
     const resp = await api.post("/reviews/reviewer/submit", dto);
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getReviewerAggregationStats = async (reviewerId: string) => {
+  try {
+    const queryParams = new URLSearchParams();
+    queryParams.append("reviewerId", reviewerId);
+
+    const resp = await api.get(
+      `/reviews/reviewer/stats?${queryParams.toString()}`,
+    );
     return resp.data;
   } catch (error) {
     throw error;

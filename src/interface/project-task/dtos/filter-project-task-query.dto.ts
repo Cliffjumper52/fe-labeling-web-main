@@ -1,4 +1,4 @@
-import { BasePaginationQueryDto } from "../../common/base-pagination-query.dto";
+import type { BasePaginationQueryDto } from "../../common/base-pagination-query.dto";
 import { ProjectTaskStatus } from "../enums/task-status.enums";
 
 export interface FilterProjectTaskQueryDto extends BasePaginationQueryDto {

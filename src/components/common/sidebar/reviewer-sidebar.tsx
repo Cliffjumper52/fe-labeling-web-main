@@ -6,7 +6,11 @@ export default function ReviewerSidebar() {
 
   const links = [
     { label: "Review Queue", to: "/reviewer" },
-    { label: "Reports", to: "/reviewer/reports" },
+    { label: "Reviews", to: "/reviewer/reviews" },
+    {
+      label: "Review Error Type",
+      to: "/reviewer/review-error-types",
+    },
   ];
 
   return (
