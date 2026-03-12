@@ -32,13 +32,14 @@ import {
   type SubmitReviewsDto,
 } from "../../services/review-service.service";
 
-import TaskDetailsPanel from "../../components/reviewer/reviewer-task/workspace/task-details-panel";
-import CanvasPreviewPanel from "../../components/reviewer/reviewer-task/workspace/canvas-preview-panel";
-import AssignedLabelsPanel from "../../components/reviewer/reviewer-task/workspace/assigned-labels-panel";
+import TaskDetailsPanel from "../../components/reviewer/workspace/task-details-panel";
+import CanvasPreviewPanel from "../../components/reviewer/workspace/canvas-preview-panel";
+import AssignedLabelsPanel from "../../components/reviewer/workspace/assigned-labels-panel";
 import WorkflowModal, {
   type WorkflowModalMode,
   type ReviewErrorTypeCreateFormState,
-} from "../../components/reviewer/reviewer-task/workspace/workflow-modal";
+} from "../../components/reviewer/workspace/workflow-modal";
+import { FileStatus } from "../../interface/file/enums/file-status.enums";
 
 const extractApiData = <T,>(payload: unknown): T | null => {
   const apiResponse = payload as ApiResponse<T>;
@@ -365,7 +366,11 @@ export default function ReviewerWorkspacePage() {
           await Promise.allSettled([
             getProjectInstructionByProjectId(projectId),
             getAllowedLabelsInProject(projectId, {}),
-            getAllFiles({ projectId, reviewerId: currentUser.id }),
+            getAllFiles({
+              projectId,
+              reviewerId: currentUser.id,
+              status: FileStatus.PENDING_REVIEW,
+            }),
           ]);
 
         if (cancelled) return;

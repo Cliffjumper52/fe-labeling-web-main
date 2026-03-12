@@ -10,4 +10,5 @@ export interface FilterProjectQueryDto extends BasePaginationQueryDto {
   searchBy?: ProjectSearchBy;
   orderBy?: ProjectOrderBy;
   includeDeleted?: boolean;
+  createdById?: string;
 }

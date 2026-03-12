@@ -1,26 +1,19 @@
 import { useEffect, useState } from "react";
 import {
   fetchAdminDashboardStats,
-  hasBackendConfig,
   type AdminDashboardStats,
 } from "../../services/admin-service";
 
-const fallbackStats: AdminDashboardStats = {
-  totalUsers: 1234,
-  totalProjects: 42,
-  totalLabels: 94,
-  totalPresets: 18,
-};
-
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<AdminDashboardStats>(fallbackStats);
+  const [stats, setStats] = useState<AdminDashboardStats>({
+    totalUsers: 0,
+    totalProjects: 0,
+    totalLabels: 0,
+    totalPresets: 0,
+  });
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!hasBackendConfig()) {
-      return;
-    }
-
     let mounted = true;
     setIsLoading(true);
 
@@ -29,6 +22,15 @@ export default function AdminDashboardPage() {
         const remoteStats = await fetchAdminDashboardStats();
         if (mounted) {
           setStats(remoteStats);
+        }
+      } catch {
+        if (mounted) {
+          setStats({
+            totalUsers: 0,
+            totalProjects: 0,
+            totalLabels: 0,
+            totalPresets: 0,
+          });
         }
       } finally {
         if (mounted) {
@@ -73,7 +75,9 @@ export default function AdminDashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white shadow rounded-lg p-4">
-          <div className="text-sm text-gray-500 mb-2">Activity (placeholder)</div>
+          <div className="text-sm text-gray-500 mb-2">
+            Activity (placeholder)
+          </div>
           <div className="h-48 flex items-center justify-center border border-dashed border-gray-200 rounded">
             Chart placeholder
           </div>

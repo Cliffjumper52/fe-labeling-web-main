@@ -1,6 +1,7 @@
-import type { Project } from "../../../../interface/project/project.interface";
-import type { ProjectTask } from "../../../../interface/project-task/project-task.interface";
-import type { ProjectInstruction } from "../../../../interface/project-instruction/project-instruction.interface";
+import type { Project } from "../../../interface";
+import type { ProjectTask } from "../../../interface";
+import type { ProjectInstruction } from "../../../interface";
+import type { File as ProjectFile } from "../../../interface";
 
 type Props = {
   project: Project | null;
@@ -8,7 +9,12 @@ type Props = {
   projectInstruction: ProjectInstruction | null;
   instructionItems: string[];
   allowedLabelNames: string[];
+  selectedFile: ProjectFile | null;
   metaError: string | null;
+};
+
+const mapFileStatusToText = (status: string): string => {
+  return status.replaceAll("_", " ");
 };
 
 export default function TaskDetailsPanel({
@@ -17,6 +23,7 @@ export default function TaskDetailsPanel({
   projectInstruction,
   instructionItems,
   allowedLabelNames,
+  selectedFile,
   metaError,
 }: Props) {
   return (
@@ -53,6 +60,14 @@ export default function TaskDetailsPanel({
             <span className="text-gray-500">Data type</span>
             <span className="text-right font-semibold capitalize text-gray-800">
               {project?.dataType ?? "--"}
+            </span>
+          </div>
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-gray-500">Selected file status</span>
+            <span className="text-right font-semibold capitalize text-gray-800">
+              {selectedFile?.status
+                ? mapFileStatusToText(selectedFile.status)
+                : "--"}
             </span>
           </div>
           <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">

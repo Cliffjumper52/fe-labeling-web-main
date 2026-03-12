@@ -1,7 +1,7 @@
-import type { Label } from "../../../../interface/label/label.interface";
-import type { Project } from "../../../../interface/project/project.interface";
-import type { ProjectInstruction } from "../../../../interface/project-instruction/project-instruction.interface";
-import type { ProjectTask } from "../../../../interface/project-task/project-task.interface";
+import type { Label } from "../../../interface/label/label.interface";
+import type { Project } from "../../../interface/project/project.interface";
+import type { ProjectInstruction } from "../../../interface/project-instruction/project-instruction.interface";
+import type { ProjectTask } from "../../../interface/project-task/project-task.interface";
 
 type Props = {
   project: Project | null;

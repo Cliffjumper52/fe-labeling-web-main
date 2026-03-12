@@ -55,9 +55,7 @@ export const router: RouterItem[] = [
     children: [
       {
         path: "dashboard",
-        Component: React.lazy(
-          () => import("../pages/admin-dashboard/page"),
-        ),
+        Component: React.lazy(() => import("../pages/admin-dashboard/page")),
       },
       {
         path: "accounts",
@@ -74,6 +72,12 @@ export const router: RouterItem[] = [
       {
         path: "presets",
         Component: React.lazy(() => import("../pages/admin-presets/page")),
+      },
+      {
+        path: "label-categories",
+        Component: React.lazy(
+          () => import("../pages/admin-label-categories/page"),
+        ),
       },
     ],
   },

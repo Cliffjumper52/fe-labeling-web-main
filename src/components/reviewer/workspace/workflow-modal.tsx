@@ -1,10 +1,10 @@
-import type { ChecklistAnswer } from "../../../../interface/checklist-answer/checklist-answer.interface";
-import type { Decision } from "../../../../interface/enums/domain.enums";
-import type { FileLabel } from "../../../../interface/file-label/file-label.interface";
-import type { LabelChecklistQuestion } from "../../../../interface/label-checklist-question/label-checklist-question.interface";
-import type { ReviewErrorType } from "../../../../interface/review-error-type/review-error-type.interface";
-import { Severity } from "../../../../interface/review-error-type/enums/severity.enums";
-import type { SubmitReviewErrorDto } from "../../../../services/review-service.service";
+import type { ChecklistAnswer } from "../../../interface/checklist-answer/checklist-answer.interface";
+import type { Decision } from "../../../interface/enums/domain.enums";
+import type { FileLabel } from "../../../interface/file-label/file-label.interface";
+import type { LabelChecklistQuestion } from "../../../interface/label-checklist-question/label-checklist-question.interface";
+import type { ReviewErrorType } from "../../../interface/review-error-type/review-error-type.interface";
+import { Severity } from "../../../interface/review-error-type/enums/severity.enums";
+import type { SubmitReviewErrorDto } from "../../../services/review-service.service";
 import { useNavigate } from "react-router";
 
 export type WorkflowModalMode = "view" | "review";

@@ -112,7 +112,6 @@ export default function ManagerLabelsPage({
   const [labels, setLabels] = useState<Label[]>(() => {
     return initialLabels ?? [];
   });
-  const [isLoading, setIsLoading] = useState(false);
   const hasLabels = labels.length > 0;
   const [labelCategories, setLabelCategories] = useState<LabelCategory[]>([]);
   const [labelsLoading, setLabelsLoading] = useState(false);

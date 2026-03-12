@@ -8,6 +8,7 @@ const buildCreateFileFormData = (dto: CreateFileDto, file?: File): FormData => {
   formData.append("projectId", dto.projectId);
   if (dto.annotatorId) formData.append("annotatorId", dto.annotatorId);
   if (dto.reviewerId) formData.append("reviewerId", dto.reviewerId);
+  if (dto.status) formData.append("status", dto.status);
   if (file) formData.append("file", file);
   return formData;
 };
@@ -17,6 +18,7 @@ const buildUpdateFileFormData = (dto: UpdateFileDto, file?: File): FormData => {
   if (dto.projectId) formData.append("projectId", dto.projectId);
   if (dto.annotatorId) formData.append("annotatorId", dto.annotatorId);
   if (dto.reviewerId) formData.append("reviewerId", dto.reviewerId);
+  if (dto.status) formData.append("status", dto.status);
   if (file) formData.append("file", file);
   return formData;
 };
@@ -65,6 +67,7 @@ export const getFilesPaginated = async (
     if (filter.reviewerId) queryParams.append("reviewerId", filter.reviewerId);
     if (filter.contentType)
       queryParams.append("contentType", filter.contentType);
+    if (filter.status) queryParams.append("status", filter.status);
     if (includeDeleted)
       queryParams.append("includeDeleted", includeDeleted.toString());
     const resp = await api.get(`/files?${queryParams.toString()}`);
@@ -92,6 +95,7 @@ export const getAllFiles = async (
     if (filter.reviewerId) queryParams.append("reviewerId", filter.reviewerId);
     if (filter.contentType)
       queryParams.append("contentType", filter.contentType);
+    if (filter.status) queryParams.append("status", filter.status);
     if (includeDeleted)
       queryParams.append("includeDeleted", includeDeleted.toString());
     const resp = await api.get(`/files/all?${queryParams.toString()}`);

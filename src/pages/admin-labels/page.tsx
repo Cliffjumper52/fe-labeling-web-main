@@ -1,17 +1,8 @@
-﻿import {
-  useEffect,
-  useState,
-  type Dispatch,
-  type FormEvent,
-  type SetStateAction,
-} from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { getLabelCategoriesPaginated } from "../../services/label-category-service.service";
 import {
-  createLabel,
   deleteLabel,
   getLabelPaginated,
-  updateLabel,
 } from "../../services/label-service.service";
 
 type ApiEnvelope<T> = { data?: T; message?: string | string[] };
@@ -31,20 +22,6 @@ type LabelItem = {
   createdAt: string;
 };
 
-type LabelForm = {
-  name: string;
-  description: string;
-  color: string;
-  categoryIds: string[];
-};
-
-const defaultForm: LabelForm = {
-  name: "",
-  description: "",
-  color: "#22c55e",
-  categoryIds: [],
-};
-
 const normalize = <T,>(raw: unknown): PaginatedPayload<T> => {
   const env = raw as ApiEnvelope<PaginatedPayload<T>>;
   return {
@@ -56,32 +33,12 @@ const normalize = <T,>(raw: unknown): PaginatedPayload<T> => {
 
 export default function AdminLabelsPage() {
   const [labels, setLabels] = useState<LabelItem[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState<LabelForm>(defaultForm);
-
-  const [editing, setEditing] = useState<LabelItem | null>(null);
-  const [editForm, setEditForm] = useState<LabelForm>(defaultForm);
-
-  const fetchCategories = async () => {
-    try {
-      const resp = await getLabelCategoriesPaginated({
-        page: 1,
-        limit: 200,
-        orderBy: "createdAt",
-        order: "DESC",
-      });
-      setCategories(normalize<Category>(resp).data);
-    } catch {
-      toast.error("Failed to load label categories");
-    }
-  };
+  const [detailItem, setDetailItem] = useState<LabelItem | null>(null);
+  const [closingDetail, setClosingDetail] = useState(false);
 
   const fetchLabels = async (nextPage = page) => {
     setLoading(true);
@@ -105,79 +62,8 @@ export default function AdminLabelsPage() {
   };
 
   useEffect(() => {
-    void fetchCategories();
     void fetchLabels(1);
   }, []);
-
-  const toggleCategoryInCreate = (categoryId: string) => {
-    setCreateForm((prev) => ({
-      ...prev,
-      categoryIds: prev.categoryIds.includes(categoryId)
-        ? prev.categoryIds.filter((id) => id !== categoryId)
-        : [...prev.categoryIds, categoryId],
-    }));
-  };
-
-  const toggleCategoryInEdit = (categoryId: string) => {
-    setEditForm((prev) => ({
-      ...prev,
-      categoryIds: prev.categoryIds.includes(categoryId)
-        ? prev.categoryIds.filter((id) => id !== categoryId)
-        : [...prev.categoryIds, categoryId],
-    }));
-  };
-
-  const onCreate = async (event: FormEvent) => {
-    event.preventDefault();
-    if (createForm.categoryIds.length === 0) {
-      toast.error("Select at least one category");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await createLabel(createForm);
-      toast.success("Label created");
-      setIsCreateOpen(false);
-      setCreateForm(defaultForm);
-      await fetchLabels(1);
-    } catch {
-      toast.error("Cannot create label");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const openEdit = (item: LabelItem) => {
-    setEditing(item);
-    setEditForm({
-      name: item.name,
-      description: item.description ?? "",
-      color: item.color ?? "#22c55e",
-      categoryIds: (item.categories ?? []).map((category) => category.id),
-    });
-  };
-
-  const onUpdate = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!editing) return;
-    if (editForm.categoryIds.length === 0) {
-      toast.error("Select at least one category");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await updateLabel(editing.id, editForm);
-      toast.success("Label updated");
-      setEditing(null);
-      await fetchLabels(page);
-    } catch {
-      toast.error("Cannot update label");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const onDelete = async (id: string) => {
     if (!window.confirm("Delete this label?")) return;
@@ -190,17 +76,18 @@ export default function AdminLabelsPage() {
     }
   };
 
+  const closeDetailModal = () => {
+    setClosingDetail(true);
+    window.setTimeout(() => {
+      setDetailItem(null);
+      setClosingDetail(false);
+    }, 200);
+  };
+
   return (
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold text-gray-800">Labels</h2>
-        <button
-          type="button"
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
-          onClick={() => setIsCreateOpen(true)}
-        >
-          New label
-        </button>
       </div>
 
       <div className="mb-4 flex gap-2">
@@ -212,7 +99,7 @@ export default function AdminLabelsPage() {
         />
         <button
           type="button"
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold"
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold hover:bg-gray-50"
           onClick={() => void fetchLabels(1)}
         >
           Refresh
@@ -251,9 +138,9 @@ export default function AdminLabelsPage() {
                 <button
                   type="button"
                   className="text-blue-600 hover:text-blue-700"
-                  onClick={() => openEdit(item)}
+                  onClick={() => setDetailItem(item)}
                 >
-                  Edit
+                  Detail
                 </button>
                 <button
                   type="button"
@@ -290,125 +177,67 @@ export default function AdminLabelsPage() {
         </button>
       </div>
 
-      {isCreateOpen && (
-        <LabelFormModal
-          title="Create label"
-          categories={categories}
-          form={createForm}
-          saving={saving}
-          onCancel={() => setIsCreateOpen(false)}
-          onSubmit={onCreate}
-          onChange={setCreateForm}
-          onToggleCategory={toggleCategoryInCreate}
-        />
-      )}
-
-      {editing && (
-        <LabelFormModal
-          title="Edit label"
-          categories={categories}
-          form={editForm}
-          saving={saving}
-          onCancel={() => setEditing(null)}
-          onSubmit={onUpdate}
-          onChange={setEditForm}
-          onToggleCategory={toggleCategoryInEdit}
-        />
-      )}
-    </div>
-  );
-}
-
-type LabelFormModalProps = {
-  title: string;
-  categories: Category[];
-  form: LabelForm;
-  saving: boolean;
-  onCancel: () => void;
-  onSubmit: (event: FormEvent) => void;
-  onChange: Dispatch<SetStateAction<LabelForm>>;
-  onToggleCategory: (categoryId: string) => void;
-};
-
-function LabelFormModal({
-  title,
-  categories,
-  form,
-  saving,
-  onCancel,
-  onSubmit,
-  onChange,
-  onToggleCategory,
-}: LabelFormModalProps) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <form
-        onSubmit={onSubmit}
-        className="flex w-full max-w-2xl flex-col gap-3 rounded-lg bg-white p-4 shadow-xl"
-      >
-        <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
-        <input
-          required
-          value={form.name}
-          onChange={(event) =>
-            onChange((prev) => ({ ...prev, name: event.target.value }))
-          }
-          placeholder="Label name"
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-        />
-        <textarea
-          value={form.description}
-          onChange={(event) =>
-            onChange((prev) => ({ ...prev, description: event.target.value }))
-          }
-          placeholder="Description"
-          className="min-h-[90px] rounded-md border border-gray-300 px-3 py-2 text-sm"
-        />
-        <input
-          value={form.color}
-          onChange={(event) =>
-            onChange((prev) => ({ ...prev, color: event.target.value }))
-          }
-          placeholder="Color hex"
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-        />
-
-        <div className="rounded-md border border-gray-200 p-3">
-          <p className="mb-2 text-xs font-semibold text-gray-700">Categories</p>
-          <div className="grid max-h-48 grid-cols-1 gap-2 overflow-y-auto md:grid-cols-2">
-            {categories.map((category) => (
-              <label
-                key={category.id}
-                className="flex items-center gap-2 text-sm"
+      {/* Detail Modal */}
+      {detailItem && (
+        <div
+          className={`fixed inset-0 flex items-center justify-center bg-black/50 transition-opacity duration-200 ${closingDetail ? "opacity-0" : "opacity-100"}`}
+        >
+          <div
+            className={`w-96 rounded-lg bg-white p-6 shadow-lg transition-transform duration-200 ${closingDetail ? "scale-95" : "scale-100"}`}
+          >
+            <h3 className="mb-4 text-lg font-semibold text-gray-800">
+              Label Details
+            </h3>
+            <div className="space-y-3 text-sm">
+              <div>
+                <label className="font-medium text-gray-700">Name</label>
+                <p className="mt-1 text-gray-600">{detailItem.name}</p>
+              </div>
+              <div>
+                <label className="font-medium text-gray-700">Description</label>
+                <p className="mt-1 text-gray-600">
+                  {detailItem.description || "No description"}
+                </p>
+              </div>
+              <div>
+                <label className="font-medium text-gray-700">Color</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <div
+                    className="h-6 w-6 rounded-md border border-gray-300"
+                    style={{ backgroundColor: detailItem.color || "#22c55e" }}
+                  />
+                  <p className="text-gray-600">
+                    {detailItem.color || "#22c55e"}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <label className="font-medium text-gray-700">Categories</label>
+                <p className="mt-1 text-gray-600">
+                  {(detailItem.categories ?? [])
+                    .map((c) => c.name)
+                    .join(", ") || "-"}
+                </p>
+              </div>
+              <div>
+                <label className="font-medium text-gray-700">Created</label>
+                <p className="mt-1 text-gray-600">
+                  {new Date(detailItem.createdAt).toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={closeDetailModal}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
               >
-                <input
-                  type="checkbox"
-                  checked={form.categoryIds.includes(category.id)}
-                  onChange={() => onToggleCategory(category.id)}
-                />
-                {category.name}
-              </label>
-            ))}
+                Close
+              </button>
+            </div>
           </div>
         </div>
-
-        <div className="mt-2 flex justify-end gap-2">
-          <button
-            type="button"
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
-            onClick={onCancel}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
-          >
-            Save
-          </button>
-        </div>
-      </form>
+      )}
     </div>
   );
 }

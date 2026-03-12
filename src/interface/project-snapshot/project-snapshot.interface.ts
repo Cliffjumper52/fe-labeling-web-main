@@ -14,3 +14,5 @@ export interface ProjectSnapshot extends BaseEntityModel {
   createdById: string;
   createdBy?: EntityReference;
 }
+
+export type ProjectSnapshotListItem = Omit<ProjectSnapshot, "snapshotData">;
