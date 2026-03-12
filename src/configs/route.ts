@@ -126,6 +126,12 @@ export const router: RouterItem[] = [
         Component: React.lazy(() => import("../pages/reviewer-reports/page")),
       },
       {
+        path: "reviews/:id",
+        Component: React.lazy(
+          () => import("../pages/reviewer-review-detail/page"),
+        ),
+      },
+      {
         path: "review-error-types",
         Component: React.lazy(
           () => import("../pages/reviewer-review-error-types/page"),

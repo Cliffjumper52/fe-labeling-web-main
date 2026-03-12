@@ -32,13 +32,13 @@ import {
   type SubmitReviewsDto,
 } from "../../services/review-service.service";
 
-import TaskDetailsPanel from "../../components/roles/reviewer/workspace/TaskDetailsPanel";
-import CanvasPreviewPanel from "../../components/roles/reviewer/workspace/CanvasPreviewPanel";
-import AssignedLabelsPanel from "../../components/roles/reviewer/workspace/AssignedLabelsPanel";
+import TaskDetailsPanel from "../../components/reviewer/reviewer-task/workspace/task-details-panel";
+import CanvasPreviewPanel from "../../components/reviewer/reviewer-task/workspace/canvas-preview-panel";
+import AssignedLabelsPanel from "../../components/reviewer/reviewer-task/workspace/assigned-labels-panel";
 import WorkflowModal, {
   type WorkflowModalMode,
   type ReviewErrorTypeCreateFormState,
-} from "../../components/roles/reviewer/workspace/WorkflowModal";
+} from "../../components/reviewer/reviewer-task/workspace/workflow-modal";
 
 const extractApiData = <T,>(payload: unknown): T | null => {
   const apiResponse = payload as ApiResponse<T>;

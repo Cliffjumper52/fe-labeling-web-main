@@ -1,6 +1,6 @@
-import type { File as ProjectFile } from "../../../../interface/file/file.interface";
-import type { FileLabel } from "../../../../interface/file-label/file-label.interface";
-import { FileLabelStatusEnums } from "../../../../interface/file-label/enums/file-label.enums";
+import type { File as ProjectFile } from "../../../interface";
+import type { FileLabel } from "../../../interface";
+import { FileLabelStatusEnums } from "../../../interface/file-label/enums/file-label.enums";
 
 const mapStatusToDotClass = (status: FileLabel["status"]): string => {
   if (status === "approved" || status === "done") {

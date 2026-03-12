@@ -5,6 +5,7 @@ import type { LabelChecklistQuestion } from "../../../../interface/label-checkli
 import type { ReviewErrorType } from "../../../../interface/review-error-type/review-error-type.interface";
 import { Severity } from "../../../../interface/review-error-type/enums/severity.enums";
 import type { SubmitReviewErrorDto } from "../../../../services/review-service.service";
+import { useNavigate } from "react-router";
 
 export type WorkflowModalMode = "view" | "review";
 
@@ -128,6 +129,7 @@ export default function WorkflowModal({
   onCreateReviewErrorTypeSubmit,
   onSubmitReview,
 }: Props) {
+  const navigate = useNavigate();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
       <div className="w-full max-w-3xl rounded-lg border border-gray-300 bg-white shadow-xl">
@@ -573,7 +575,11 @@ export default function WorkflowModal({
                       <div className="mt-2">
                         <button
                           type="button"
-                          onClick={() => {}}
+                          onClick={() => {
+                            navigate(
+                              `/reviewer/review/detail?checklistId=${snapshot.id}`,
+                            );
+                          }}
                           className="rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700"
                         >
                           Review details

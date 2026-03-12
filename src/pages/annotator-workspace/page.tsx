@@ -22,12 +22,12 @@ import { getAllLabelChecklistQuestions } from "../../services/label-checklist-qu
 import { getAllowedLabelsInProject } from "../../services/label-service.service";
 import { getProjectInstructionByProjectId } from "../../services/project-instruction-service.service";
 import { getProjectTaskById } from "../../services/project-task-service.service";
-import TaskDetailsPanel from "../../components/roles/annotator/workspace/TaskDetailsPanel";
-import CanvasPreviewPanel from "../../components/roles/annotator/workspace/CanvasPreviewPanel";
-import AssignedLabelsPanel from "../../components/roles/annotator/workspace/AssignedLabelsPanel";
+import TaskDetailsPanel from "../../components/annotator/workspace/task-details-panel";
+import CanvasPreviewPanel from "../../components/annotator/workspace/canvas-preview-panel";
+import AssignedLabelsPanel from "../../components/annotator/workspace/assigned-label-panel";
 import WorkflowModal, {
   type WorkflowModalMode,
-} from "../../components/roles/annotator/workspace/WorkflowModal";
+} from "../../components/annotator/workspace/workflow-modal";
 
 const extractApiData = <T,>(payload: unknown): T | null => {
   const apiResponse = payload as ApiResponse<T>;
