@@ -64,9 +64,9 @@ export default function ManagerPresetsPage({
   const [presetName, setPresetName] = useState("");
   const [presetDescription, setPresetDescription] = useState("");
   const [presetLabelQuery, setPresetLabelQuery] = useState("");
-  const [selectedPresetLabelIds, setSelectedPresetLabelIds] = useState<string[]>(
-    [],
-  );
+  const [selectedPresetLabelIds, setSelectedPresetLabelIds] = useState<
+    string[]
+  >([]);
   const [labelSelectError, setLabelSelectError] = useState<string | null>(null);
   const [isEditPresetOpen, setIsEditPresetOpen] = useState(false);
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
@@ -76,11 +76,12 @@ export default function ManagerPresetsPage({
   const [editSelectedPresetLabelIds, setEditSelectedPresetLabelIds] = useState<
     string[]
   >([]);
-  const [editLabelSelectError, setEditLabelSelectError] = useState<string | null>(
-    null,
-  );
+  const [editLabelSelectError, setEditLabelSelectError] = useState<
+    string | null
+  >(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailPreset, setDetailPreset] = useState<Preset | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
@@ -236,9 +237,7 @@ export default function ManagerPresetsPage({
       setCurrentPage(1);
       await loadPresets();
     } catch (error) {
-      setPresetsError(
-        extractErrorMessage(error, "Failed to create preset."),
-      );
+      setPresetsError(extractErrorMessage(error, "Failed to create preset."));
     }
   };
 
@@ -262,7 +261,9 @@ export default function ManagerPresetsPage({
   };
 
   const handleRemovePresetLabel = (labelId: string) => {
-    setSelectedPresetLabelIds((prev) => prev.filter((item) => item !== labelId));
+    setSelectedPresetLabelIds((prev) =>
+      prev.filter((item) => item !== labelId),
+    );
   };
 
   const handleOpenEditPreset = (preset: Preset) => {
@@ -316,9 +317,7 @@ export default function ManagerPresetsPage({
       resetEditPresetForm();
       await loadPresets();
     } catch (error) {
-      setPresetsError(
-        extractErrorMessage(error, "Failed to update preset."),
-      );
+      setPresetsError(extractErrorMessage(error, "Failed to update preset."));
     }
   };
 
@@ -349,9 +348,7 @@ export default function ManagerPresetsPage({
         await deleteLabelPreset(presetId);
         setPresets((prev) => prev.filter((preset) => preset.id !== presetId));
       } catch (error) {
-        setPresetsError(
-          extractErrorMessage(error, "Failed to delete preset."),
-        );
+        setPresetsError(extractErrorMessage(error, "Failed to delete preset."));
       }
     };
 
@@ -377,22 +374,26 @@ export default function ManagerPresetsPage({
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-800">Presets</h2>
-        {!isAdmin && (
-          <button
-            type="button"
-            onClick={() => {
-              resetCreatePresetForm();
-              setIsCreatePresetOpen(true);
-            }}
-            className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-          >
-            <span className="text-lg leading-none">+</span>
-            New Preset
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => {
+            resetCreatePresetForm();
+            setIsCreatePresetOpen(true);
+          }}
+          className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+        >
+          <span className="text-lg leading-none">+</span>
+          New Preset
+        </button>
       </div>
 
       <div className="mb-4 h-px w-full bg-gray-200" />
+
+      {isLoading && (
+        <div className="mb-4 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+          Loading presets from API...
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <div className="flex flex-col gap-1">
@@ -418,13 +419,17 @@ export default function ManagerPresetsPage({
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-gray-700">Order by</label>
+          <label className="text-xs font-semibold text-gray-700">
+            Order by
+          </label>
           <select
             title="Order presets by"
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
             value={orderBy}
             onChange={(event) =>
-              setOrderBy(event.target.value as "Name" | "Date created" | "Updated")
+              setOrderBy(
+                event.target.value as "Name" | "Date created" | "Updated",
+              )
             }
           >
             <option>Name</option>
@@ -440,9 +445,7 @@ export default function ManagerPresetsPage({
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
             value={order}
             onChange={(event) =>
-              setOrder(
-                event.target.value as "All" | "Ascending" | "Descending",
-              )
+              setOrder(event.target.value as "All" | "Ascending" | "Descending")
             }
           >
             <option>All</option>
@@ -495,19 +498,17 @@ export default function ManagerPresetsPage({
               ? "No presets are available right now."
               : "Create your first preset to reuse label groups"}
           </p>
-          {!isAdmin && (
-            <button
-              type="button"
-              onClick={() => {
-                resetCreatePresetForm();
-                setIsCreatePresetOpen(true);
-              }}
-              className="mt-5 flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-            >
-              <span className="text-base leading-none">+</span>
-              Create Preset
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              resetCreatePresetForm();
+              setIsCreatePresetOpen(true);
+            }}
+            className="mt-5 flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+          >
+            <span className="text-base leading-none">+</span>
+            Create Preset
+          </button>
         </div>
       ) : (
         <div className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -546,23 +547,20 @@ export default function ManagerPresetsPage({
                 >
                   Details
                 </button>
-                {isAdmin ? (
-                  <button
-                    type="button"
-                    onClick={() => handleDeletePreset(preset.id)}
-                    className="text-red-500 hover:text-red-600"
-                  >
-                    Delete
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEditPreset(preset)}
-                    className="text-blue-600 hover:text-blue-700"
-                  >
-                    Edit
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditPreset(preset)}
+                  className="text-blue-600 hover:text-blue-700"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeletePreset(preset.id)}
+                  className="text-red-500 hover:text-red-600"
+                >
+                  Delete
+                </button>
               </div>
             </div>
           ))}
@@ -717,7 +715,7 @@ export default function ManagerPresetsPage({
         </div>
       )}
 
-      {!isAdmin && isEditPresetOpen && (
+      {isEditPresetOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
           <div
             className={`w-full max-w-md rounded-lg border border-gray-300 bg-white shadow-xl ${
@@ -725,7 +723,9 @@ export default function ManagerPresetsPage({
             }`}
           >
             <div className="flex items-center justify-between border-b px-4 py-3">
-              <h3 className="text-sm font-semibold text-gray-800">Edit preset</h3>
+              <h3 className="text-sm font-semibold text-gray-800">
+                Edit preset
+              </h3>
               <button
                 type="button"
                 onClick={() => {
@@ -748,9 +748,14 @@ export default function ManagerPresetsPage({
               </button>
             </div>
 
-            <form onSubmit={handleUpdatePreset} className="flex flex-col gap-4 p-4">
+            <form
+              onSubmit={handleUpdatePreset}
+              className="flex flex-col gap-4 p-4"
+            >
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">Preset name</label>
+                <label className="text-xs font-semibold text-gray-700">
+                  Preset name
+                </label>
                 <input
                   value={editPresetName}
                   onChange={(event) => setEditPresetName(event.target.value)}
@@ -766,18 +771,24 @@ export default function ManagerPresetsPage({
                 </label>
                 <textarea
                   value={editPresetDescription}
-                  onChange={(event) => setEditPresetDescription(event.target.value)}
+                  onChange={(event) =>
+                    setEditPresetDescription(event.target.value)
+                  }
                   className="min-h-[100px] rounded-md border border-gray-300 px-3 py-2 text-sm"
                   placeholder="Example description"
                 />
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-gray-700">Edit labels</label>
+                <label className="text-xs font-semibold text-gray-700">
+                  Edit labels
+                </label>
                 <div className="flex items-center gap-2">
                   <input
                     value={editPresetLabelQuery}
-                    onChange={(event) => setEditPresetLabelQuery(event.target.value)}
+                    onChange={(event) =>
+                      setEditPresetLabelQuery(event.target.value)
+                    }
                     className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
                     placeholder="Label name..."
                     list="edit-preset-label-options"
@@ -796,10 +807,14 @@ export default function ManagerPresetsPage({
               </div>
 
               <div className="rounded-md border border-gray-200 p-3">
-                <span className="text-xs font-semibold text-gray-700">Selected labels</span>
+                <span className="text-xs font-semibold text-gray-700">
+                  Selected labels
+                </span>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {editSelectedPresetLabelIds.length === 0 && (
-                    <span className="text-xs text-gray-400">No labels selected</span>
+                    <span className="text-xs text-gray-400">
+                      No labels selected
+                    </span>
                   )}
                   {editSelectedPresetLabelIds.map((labelId) => (
                     <span

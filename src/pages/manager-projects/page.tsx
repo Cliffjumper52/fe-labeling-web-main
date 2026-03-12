@@ -9,12 +9,13 @@ import {
   type MouseEvent,
   type SetStateAction,
 } from "react";
-import { Link } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { saveFilesToImageStore, type StoredImageRef } from "../../utils/image-store";
 import type { ApiResponse } from "../../interface/common/api-response.interface";
-import type { DataType, ProjectStatus } from "../../interface/enums/domain.enums";
+import type {
+  DataType,
+  ProjectStatus,
+} from "../../interface/enums/domain.enums";
 import type { Project as ApiProject } from "../../interface/project/project.interface";
 import type { LabelPreset as ApiLabelPreset } from "../../interface/label-preset/label-preset.interface";
 import {
@@ -26,6 +27,7 @@ import {
 } from "../../services/project-service.service";
 import { getLabelPresetsPaginated } from "../../services/label-preset-service.service";
 import Pagination from "../../components/common/pagination";
+import { Link } from "react-router";
 
 type Project = {
   id: string;
@@ -34,12 +36,6 @@ type Project = {
   status: "Drafting" | "Active" | "Archived" | "Completed";
   dataType: "Image" | "Video" | "Text" | "Audio";
   createdAt: string;
-  uploadedFiles?: string[];
-  selectedPreset?: Preset | null;
-  assignedAnnotatorIds?: string[];
-  assignedReviewerIds?: string[];
-  annotatorFileAssignments?: Record<string, string[]>;
-  reviewerFileAssignments?: Record<string, string[]>;
 };
 
 type Preset = {
@@ -61,48 +57,6 @@ type TeamMember = {
 type UploadedImage = {
   name: string;
   dataUrl: string;
-};
-
-type UploadImageFile = {
-  name: string;
-  file: File;
-};
-
-const createImagePlaceholderDataUrl = (label: string) => {
-  const safe = encodeURIComponent(label);
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360'><rect width='100%' height='100%' fill='#f3f4f6'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#374151' font-size='20' font-family='Arial, sans-serif'>${safe}</text></svg>`;
-  return `data:image/svg+xml;utf8,${svg}`;
-};
-
-const toLightweightImages = (images: UploadedImage[]) => {
-  return images.map((image) => ({
-    name: image.name,
-    dataUrl: createImagePlaceholderDataUrl(image.name),
-  }));
-};
-
-const compactUnknownImages = (value: unknown): UploadedImage[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .map((item) => {
-      if (typeof item !== "object" || item === null) {
-        return null;
-      }
-
-      const raw = item as { name?: unknown };
-      if (typeof raw.name !== "string") {
-        return null;
-      }
-
-      return {
-        name: raw.name,
-        dataUrl: createImagePlaceholderDataUrl(raw.name),
-      };
-    })
-    .filter((item): item is UploadedImage => item !== null);
 };
 
 const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
@@ -218,8 +172,8 @@ export default function ManagerProjectsPage({
   initialProjects,
 }: ManagerProjectsPageProps) {
   const isAdmin = mode === "admin";
-  const [projects, setProjects] = useState<Project[]>(() =>
-    initialProjects ?? [],
+  const [projects, setProjects] = useState<Project[]>(
+    () => initialProjects ?? [],
   );
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [projectsError, setProjectsError] = useState<string | null>(null);
@@ -232,30 +186,26 @@ export default function ManagerProjectsPage({
   const [projectOrderBy, setProjectOrderBy] = useState<
     "Name" | "Date created" | "Updated"
   >("Date created");
-  const [projectOrder, setProjectOrder] = useState<
-    "Ascending" | "Descending"
-  >("Descending");
+  const [projectOrder, setProjectOrder] = useState<"Ascending" | "Descending">(
+    "Descending",
+  );
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
-  const [projectDataType, setProjectDataType] = useState<Project["dataType"]>(
-    "Image",
-  );
+  const [projectDataType, setProjectDataType] =
+    useState<Project["dataType"]>("Image");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
-  const [editProjectName, setEditProjectName] = useState("");
-  const [editProjectDescription, setEditProjectDescription] = useState("");
-  const [editProjectDataType, setEditProjectDataType] = useState<
-    Project["dataType"]
-  >("Image");
+  const [editProjectName] = useState("");
+  const [editProjectDescription] = useState("");
+  const [editProjectDataType] = useState<Project["dataType"]>("Image");
   const [presets, setPresets] = useState<Preset[]>([]);
   const [presetsLoading, setPresetsLoading] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedUploadFiles, setSelectedUploadFiles] = useState<File[]>([]);
   const [uploadName, setUploadName] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
-  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
-  const [uploadedImageFiles, setUploadedImageFiles] = useState<UploadImageFile[]>([]);
+  const [, setUploadedImages] = useState<UploadedImage[]>([]);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailProject, setDetailProject] = useState<Project | null>(null);
@@ -264,32 +214,8 @@ export default function ManagerProjectsPage({
   const [isSelectPresetOpen, setIsSelectPresetOpen] = useState(false);
   const [createPresetSearch, setCreatePresetSearch] = useState("");
   const [assignSearch, setAssignSearch] = useState("");
-  const [selectedAnnotatorId, setSelectedAnnotatorId] = useState<string | null>(
-    null,
-  );
-  const [selectedReviewerId, setSelectedReviewerId] = useState<string | null>(
-    null,
-  );
-  const [selectedAnnotatorFiles, setSelectedAnnotatorFiles] = useState<string[]>(
-    [],
-  );
-  const [selectedReviewerFiles, setSelectedReviewerFiles] = useState<string[]>([]);
-  const [annotatorFileAssignments, setAnnotatorFileAssignments] = useState<
-    Record<string, string[]>
-  >({});
-  const [reviewerFileAssignments, setReviewerFileAssignments] = useState<
-    Record<string, string[]>
-  >({});
-  const assignedReviewerIds = useMemo(() => {
-    const ids = new Set<string>();
-    Object.values(reviewerFileAssignments).forEach((assigned) => {
-      assigned.forEach((id) => ids.add(id));
-    });
-    if (selectedReviewerId) {
-      ids.add(selectedReviewerId);
-    }
-    return Array.from(ids);
-  }, [reviewerFileAssignments, selectedReviewerId]);
+  const [selectedAnnotators, setSelectedAnnotators] = useState<string[]>([]);
+  const [selectedReviewers, setSelectedReviewers] = useState<string[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
   const [presetSearch, setPresetSearch] = useState("");
   const [selectedPresetIds, setSelectedPresetIds] = useState<string[]>([]);
@@ -302,16 +228,6 @@ export default function ManagerProjectsPage({
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
-  const assignedAnnotatorIds = useMemo(() => {
-    const ids = new Set<string>();
-    Object.values(annotatorFileAssignments).forEach((assigned) => {
-      assigned.forEach((id) => ids.add(id));
-    });
-    if (selectedAnnotatorId) {
-      ids.add(selectedAnnotatorId);
-    }
-    return Array.from(ids);
-  }, [annotatorFileAssignments, selectedAnnotatorId]);
 
   const selectedPresets = useMemo(() => {
     if (selectedPresetIds.length === 0) {
@@ -373,7 +289,9 @@ export default function ManagerProjectsPage({
   };
 
   const isNotFoundError = (error: unknown) => {
-    return (error as { response?: { status?: number } })?.response?.status === 404;
+    return (
+      (error as { response?: { status?: number } })?.response?.status === 404
+    );
   };
 
   const dataTypeEnumToLabel = (value: DataType): Project["dataType"] => {
@@ -458,7 +376,8 @@ export default function ManagerProjectsPage({
         limit: 50,
       });
 
-      const fetched = extractArray<ApiLabelPreset>(response).map(mapLabelPreset);
+      const fetched =
+        extractArray<ApiLabelPreset>(response).map(mapLabelPreset);
       setPresets(fetched);
     } catch (error) {
       setProjectsError(
@@ -491,9 +410,7 @@ export default function ManagerProjectsPage({
     }
 
     const availableLabelIds = Array.from(
-      new Set(
-        selectedPresets.flatMap((preset) => preset.labelIds),
-      ),
+      new Set(selectedPresets.flatMap((preset) => preset.labelIds)),
     );
     if (availableLabelIds.length === 0) {
       setProjectsError("Selected presets have no labels.");
@@ -525,35 +442,6 @@ export default function ManagerProjectsPage({
     } catch (error) {
       setProjectsError(extractErrorMessage(error, "Failed to create project."));
     }
-  };
-
-  const handleOpenEdit = (project: Project) => {
-    setActiveProject(project);
-    setEditProjectName(project.name);
-    setEditProjectDescription(project.description ?? "");
-    setEditProjectDataType(project.dataType);
-    const annotatorIds = project.assignedAnnotatorIds ?? [];
-    const reviewerIds = project.assignedReviewerIds ?? [];
-    setSelectedAnnotatorId(annotatorIds.length === 1 ? annotatorIds[0] : null);
-    setSelectedReviewerId(reviewerIds.length === 1 ? reviewerIds[0] : null);
-    setSelectedAnnotatorFiles([]);
-    setSelectedReviewerFiles([]);
-    setAnnotatorFileAssignments(project.annotatorFileAssignments ?? {});
-    setReviewerFileAssignments(project.reviewerFileAssignments ?? {});
-    setSelectedPreset(project.selectedPreset ?? null);
-    setUploadedFiles(project.uploadedFiles ?? []);
-    setUploadedImages([]);
-    setUploadedImageFiles([]);
-    setIsEditOpen(true);
-    setIsUploadOpen(false);
-    setIsAssignAnnotatorsOpen(false);
-    setIsAssignReviewersOpen(false);
-    setIsSelectPresetOpen(false);
-  };
-
-  const handleOpenDetails = (project: Project) => {
-    setDetailProject(project);
-    setIsDetailOpen(true);
   };
 
   const handleUploadFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -590,14 +478,8 @@ export default function ManagerProjectsPage({
         })),
       );
 
-      const filePayload = selectedUploadFiles.map((file, index) => ({
-        name: updatedNames[index],
-        file,
-      }));
-
       setUploadedFiles((prev) => [...prev, ...updatedNames]);
       setUploadedImages((prev) => [...prev, ...imagePayload]);
-      setUploadedImageFiles((prev) => [...prev, ...filePayload]);
     }
     setIsUploadOpen(false);
     setSelectedUploadFiles([]);
@@ -681,28 +563,16 @@ export default function ManagerProjectsPage({
     }
   };
 
-  const pushTaskToAnnotatorQueue = async () => {
+  const pushTaskToAnnotatorQueue = () => {
     if (!activeProject) {
       return false;
     }
-    const assignedNames = resolveNames(
-      annotators,
-      assignedAnnotatorIds,
-    );
-    const reviewerNames = resolveNames(
-      reviewers,
-      assignedReviewerIds,
-    );
+    const assignedNames = resolveNames(annotators, selectedAnnotators);
     const today = new Date();
     const dueDate = new Date(today);
     dueDate.setDate(today.getDate() + 7);
 
-    let uploadedImageRefs: StoredImageRef[] = [];
-    if (uploadedImageFiles.length > 0) {
-      uploadedImageRefs = await saveFilesToImageStore(uploadedImageFiles);
-    }
-
-    const basePayload = {
+    const payload = {
       id: `task-${activeProject.id}`,
       projectName: activeProject.name,
       dataset:
@@ -713,7 +583,8 @@ export default function ManagerProjectsPage({
       status: "In Progress" as const,
       assignedAt: today.toISOString().slice(0, 10),
       dueAt: dueDate.toISOString().slice(0, 10),
-      aiPrelabel: uploadedFiles.length > 0 ? ("Ready" as const) : ("Off" as const),
+      aiPrelabel:
+        uploadedFiles.length > 0 ? ("Ready" as const) : ("Off" as const),
       preset: selectedPreset?.name || "Custom preset",
       progress: 0,
       instructions: [
@@ -726,12 +597,6 @@ export default function ManagerProjectsPage({
       ],
       labels: selectedPreset?.labelNames ?? ["Label A", "Label B"],
       assignedAnnotators: assignedNames,
-      assignedReviewers: reviewerNames,
-      assignedAnnotatorIds,
-      assignedReviewerIds,
-      annotatorAssignmentsByFile: annotatorFileAssignments,
-      reviewerAssignmentsByFile: reviewerFileAssignments,
-      uploadedImageRefs,
     };
 
     const raw = localStorage.getItem(ANNOTATOR_TASKS_STORAGE_KEY);
@@ -746,47 +611,17 @@ export default function ManagerProjectsPage({
       }
     }
 
-    const buildNext = (images: UploadedImage[]) => {
-      const payload = {
-        ...basePayload,
-        uploadedImages: images,
-      };
-
-      return [
-        payload,
-        ...existing.filter((item) => item.id !== payload.id),
-      ];
-    };
+    const next = [
+      payload,
+      ...existing.filter((item) => item.id !== payload.id),
+    ];
 
     try {
-      const next = buildNext(toLightweightImages(uploadedImages));
       localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(next));
       window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
       return true;
     } catch {
-      try {
-        const compactExisting: Array<Record<string, unknown>> = existing.map((item) => ({
-          ...item,
-          uploadedImages: compactUnknownImages(item.uploadedImages),
-          submittedImages: compactUnknownImages(item.submittedImages),
-        }));
-
-        const payload = {
-          ...basePayload,
-          uploadedImages: toLightweightImages(uploadedImages),
-        };
-
-        const next = [
-          payload,
-          ...compactExisting.filter((item) => item["id"] !== payload.id),
-        ];
-        localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(next));
-        window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
-        toast.warning("Images were optimized for storage limit. Assignment still succeeded.");
-        return true;
-      } catch {
-        return false;
-      }
+      return false;
     }
   };
 
@@ -794,7 +629,9 @@ export default function ManagerProjectsPage({
     try {
       const queued = await pushTaskToAnnotatorQueue();
       if (!queued) {
-        toast.error("Assign failed: storage is full or project data is invalid.");
+        toast.error(
+          "Assign failed: storage is full or project data is invalid.",
+        );
         return;
       }
 
@@ -831,24 +668,6 @@ export default function ManagerProjectsPage({
 
   const resolveNames = (list: TeamMember[], ids: string[]) => {
     return ids.map((id) => list.find((item) => item.id === id)?.name || id);
-  };
-
-  const applyAssignments = (
-    selectedFiles: string[],
-    selectedMembers: string[],
-    setAssignments: Dispatch<SetStateAction<Record<string, string[]>>>,
-  ) => {
-    if (selectedFiles.length === 0 || selectedMembers.length === 0) {
-      return;
-    }
-    setAssignments((prev) => {
-      const next = { ...prev };
-      selectedFiles.forEach((file) => {
-        const existing = next[file] ?? [];
-        next[file] = Array.from(new Set([...existing, ...selectedMembers]));
-      });
-      return next;
-    });
   };
 
   const loadProjects = async () => {
@@ -952,7 +771,8 @@ export default function ManagerProjectsPage({
       return;
     }
 
-    const nextSelected = presets.find((item) => item.id === selectedPreset.id) ?? null;
+    const nextSelected =
+      presets.find((item) => item.id === selectedPreset.id) ?? null;
     if (!nextSelected) {
       setSelectedPreset(null);
       return;
@@ -982,19 +802,23 @@ export default function ManagerProjectsPage({
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-800">Projects</h2>
-        {!isAdmin && (
-          <button
-            type="button"
-            onClick={() => setIsCreateOpen(true)}
-            className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-          >
-            <span className="text-lg leading-none">+</span>
-            New Project
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setIsCreateOpen(true)}
+          className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+        >
+          <span className="text-lg leading-none">+</span>
+          New Project
+        </button>
       </div>
 
       <div className="mb-4 h-px w-full bg-gray-200" />
+
+      {projectsLoading && (
+        <div className="mb-4 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+          Loading projects from API...
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <div className="flex flex-col gap-1">
@@ -1040,7 +864,9 @@ export default function ManagerProjectsPage({
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-gray-700">Order by</label>
+          <label className="text-xs font-semibold text-gray-700">
+            Order by
+          </label>
           <select
             title="Order projects by"
             value={projectOrderBy}
@@ -1102,16 +928,14 @@ export default function ManagerProjectsPage({
               ? "No projects are available right now."
               : "Get started by creating your first data labeling project"}
           </p>
-          {!isAdmin && (
-            <button
-              type="button"
-              onClick={() => setIsCreateOpen(true)}
-              className="mt-5 flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-            >
-              <span className="text-base leading-none">+</span>
-              Create Project
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="mt-5 flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+          >
+            <span className="text-base leading-none">+</span>
+            Create Project
+          </button>
         </div>
       ) : (
         <div className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -1178,344 +1002,85 @@ export default function ManagerProjectsPage({
         </div>
       )}
 
-      {!isAdmin && isCreateOpen && createPortal(
-        <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30 px-4"
-          onClick={(event) =>
-            handleOverlayClick(event, "createProject", setIsCreateOpen)
-          }
-        >
+      {!isAdmin &&
+        isCreateOpen &&
+        createPortal(
           <div
-            className={`max-h-[85vh] w-full max-w-md overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl ${
-              closingModals.createProject ? "modal-pop-out" : "modal-pop"
-            }`}
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30 px-4"
+            onClick={(event) =>
+              handleOverlayClick(event, "createProject", setIsCreateOpen)
+            }
           >
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <h3 className="text-sm font-semibold text-gray-800">
-                Create new project
-              </h3>
-              <button
-                type="button"
-                onClick={() => closeWithAnimation("createProject", setIsCreateOpen)}
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Close"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M6 6l12 12" />
-                  <path d="M18 6l-12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleCreate} className="flex flex-col gap-4 p-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">
-                  Project name
-                </label>
-                <input
-                  value={projectName}
-                  onChange={(event) => setProjectName(event.target.value)}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="Example name"
-                  required
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">
-                  Project description
-                </label>
-                <textarea
-                  value={projectDescription}
-                  onChange={(event) => setProjectDescription(event.target.value)}
-                  className="min-h-[120px] rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="Example description"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">
-                  Data type
-                </label>
-                <select
-                  value={projectDataType}
-                  onChange={(event) =>
-                    setProjectDataType(event.target.value as Project["dataType"])
-                  }
-                  title="Project data type"
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                >
-                  <option value="Image">Image</option>
-                  <option value="Video">Video</option>
-                  <option value="Text">Text</option>
-                  <option value="Audio">Audio</option>
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">
-                  Label presets <span className="text-red-500">*</span>
-                </label>
-                <input
-                  value={createPresetSearch}
-                  onChange={(event) => setCreatePresetSearch(event.target.value)}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="Search presets..."
-                />
-                <div className="mt-2 max-h-48 space-y-2 overflow-y-auto rounded-md border border-gray-200 p-2">
-                  {presetsLoading ? (
-                    <p className="text-xs text-gray-400">Loading presets...</p>
-                  ) : presets.length === 0 ? (
-                    <p className="text-xs text-gray-400">No presets found.</p>
-                  ) : (
-                    presets
-                      .filter((preset) =>
-                        `${preset.name} ${preset.description ?? ""}`
-                          .toLowerCase()
-                          .includes(createPresetSearch.toLowerCase()),
-                      )
-                      .map((preset) => (
-                        <label
-                          key={preset.id}
-                          className="flex items-start justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
-                        >
-                          <div>
-                            <p className="font-semibold text-gray-800">
-                              {preset.name}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {preset.description || "No description"}
-                            </p>
-                            <p className="mt-1 text-[11px] text-gray-400">
-                              {preset.labelIds.length} labels
-                            </p>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={selectedPresetIds.includes(preset.id)}
-                            onChange={() =>
-                              toggleSelection(preset.id, setSelectedPresetIds)
-                            }
-                          />
-                        </label>
-                      ))
-                  )}
-                </div>
-                {selectedPresetIds.length > 0 && (
-                  <p className="text-xs text-gray-500">
-                    {selectedPresetIds.length} preset(s) selected
-                  </p>
-                )}
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-                >
-                  <span className="text-base leading-none">+</span>
-                  Create Project
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      , document.body)}
-
-      {isDetailOpen && detailProject && createPortal(
-        <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30 px-4"
-          onClick={(event) =>
-            handleOverlayClick(event, "projectDetails", setIsDetailOpen)
-          }
-        >
-          <div
-            className={`max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl ${
-              closingModals.projectDetails ? "modal-pop-out" : "modal-pop"
-            }`}
-          >
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <h3 className="text-base font-semibold text-gray-800">
-                Project details
-              </h3>
-              <button
-                type="button"
-                onClick={() => closeWithAnimation("projectDetails", setIsDetailOpen)}
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-4">
-              <div className="rounded-md border border-gray-200 p-3 shadow-sm">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-base font-semibold text-gray-900">
-                      {detailProject.name}
-                    </h2>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {detailProject.description || "No description provided"}
-                    </p>
-                  </div>
-                  <span className="rounded-md bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-                    {detailProject.status}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-md border border-gray-200 p-3">
-                  <p className="text-xs font-semibold text-gray-700">
-                    Assigned Annotators
-                  </p>
-                  <p className="mt-2 text-sm text-gray-800">
-                    {(detailProject.assignedAnnotatorIds ?? []).length === 0
-                      ? "Unassigned"
-                      : resolveNames(
-                          annotators,
-                          detailProject.assignedAnnotatorIds ?? [],
-                        ).join(", ")}
-                  </p>
-                </div>
-                <div className="rounded-md border border-gray-200 p-3">
-                  <p className="text-xs font-semibold text-gray-700">
-                    Assigned Reviewer
-                  </p>
-                  <p className="mt-2 text-sm text-gray-800">
-                    {(detailProject.assignedReviewerIds ?? []).length === 0
-                      ? "Unassigned"
-                      : resolveNames(
-                          reviewers,
-                          detailProject.assignedReviewerIds ?? [],
-                        ).join(", ")}
-                  </p>
-                </div>
-                <div className="rounded-md border border-gray-200 p-3">
-                  <p className="text-xs font-semibold text-gray-700">
-                    Selected Preset
-                  </p>
-                  <p className="mt-2 text-sm text-gray-800">
-                    {detailProject.selectedPreset?.name ||
-                      "No preset selected"}
-                  </p>
-                </div>
-                <div className="rounded-md border border-gray-200 p-3">
-                  <p className="text-xs font-semibold text-gray-700">Uploaded files</p>
-                  {(detailProject.uploadedFiles ?? []).length === 0 ? (
-                    <p className="mt-2 text-xs text-gray-400">No images uploaded</p>
-                  ) : (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {(detailProject.uploadedFiles ?? []).map((file) => (
-                        <span
-                          key={file}
-                          className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
-                        >
-                          {file}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-4 flex justify-end">
+            <div
+              className={`max-h-[85vh] w-full max-w-md overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl ${
+                closingModals.createProject ? "modal-pop-out" : "modal-pop"
+              }`}
+            >
+              <div className="flex items-center justify-between border-b px-4 py-3">
+                <h3 className="text-sm font-semibold text-gray-800">
+                  Create new project
+                </h3>
                 <button
                   type="button"
-                  onClick={() => closeWithAnimation("projectDetails", setIsDetailOpen)}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                  onClick={() =>
+                    closeWithAnimation("createProject", setIsCreateOpen)
+                  }
+                  className="text-gray-500 hover:text-gray-700"
+                  aria-label="Close"
                 >
-                  Close
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M6 6l12 12" />
+                    <path d="M18 6l-12 12" />
+                  </svg>
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      , document.body)}
 
-      {isEditOpen && activeProject && createPortal(
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 px-3"
-          onClick={(event) =>
-            handleOverlayClick(event, "editProject", setIsEditOpen)
-          }
-        >
-          <div
-            className={`max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-md border border-gray-300 bg-white shadow-xl ${
-              closingModals.editProject ? "modal-pop-out" : "modal-pop"
-            }`}
-          >
-            <div className="relative flex items-center justify-between border-b px-3 py-2">
-              <button
-                type="button"
-                onClick={() => closeWithAnimation("editProject", setIsEditOpen)}
-                className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100"
-              >
-                ← Go back
-              </button>
-              <h3 className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-gray-800">
-                Edit project
-              </h3>
-              <button
-                type="button"
-                onClick={() => closeWithAnimation("editProject", setIsEditOpen)}
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-2">
-              <div className="rounded-md border border-gray-200 px-2 py-2 shadow-sm">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-base font-semibold text-gray-900">
-                      {editProjectName || activeProject.name}
-                    </h2>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {editProjectDescription ||
-                        "Example Image Classification Example"}
-                    </p>
-                  </div>
-                  <span className="rounded-md bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-                    {activeProject.status}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-2 grid grid-cols-1 gap-2 rounded-md border border-gray-200 p-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-1 sm:col-span-2">
-                  <label className="text-xs font-semibold text-gray-700">Project name</label>
-                  <input
-                    value={editProjectName}
-                    onChange={(event) => setEditProjectName(event.target.value)}
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                    placeholder="Project name"
-                  />
-                </div>
-                <div className="flex flex-col gap-1 sm:col-span-2">
-                  <label className="text-xs font-semibold text-gray-700">Project description</label>
-                  <textarea
-                    value={editProjectDescription}
-                    onChange={(event) => setEditProjectDescription(event.target.value)}
-                    className="min-h-[80px] rounded-md border border-gray-300 px-3 py-2 text-sm"
-                    placeholder="Project description"
-                  />
-                </div>
+              <form onSubmit={handleCreate} className="flex flex-col gap-4 p-4">
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-gray-700">Data type</label>
-                  <select
-                    value={editProjectDataType}
+                  <label className="text-xs font-semibold text-gray-700">
+                    Project name
+                  </label>
+                  <input
+                    value={projectName}
+                    onChange={(event) => setProjectName(event.target.value)}
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="Example name"
+                    required
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-700">
+                    Project description
+                  </label>
+                  <textarea
+                    value={projectDescription}
                     onChange={(event) =>
-                      setEditProjectDataType(event.target.value as Project["dataType"])
+                      setProjectDescription(event.target.value)
                     }
+                    className="min-h-[120px] rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="Example description"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-700">
+                    Data type
+                  </label>
+                  <select
+                    value={projectDataType}
+                    onChange={(event) =>
+                      setProjectDataType(
+                        event.target.value as Project["dataType"],
+                      )
+                    }
+                    title="Project data type"
                     className="rounded-md border border-gray-300 px-3 py-2 text-sm"
                   >
                     <option value="Image">Image</option>
@@ -1524,766 +1089,950 @@ export default function ManagerProjectsPage({
                     <option value="Audio">Audio</option>
                   </select>
                 </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-700">
+                    Label presets <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    value={createPresetSearch}
+                    onChange={(event) =>
+                      setCreatePresetSearch(event.target.value)
+                    }
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="Search presets..."
+                  />
+                  <div className="mt-2 max-h-48 space-y-2 overflow-y-auto rounded-md border border-gray-200 p-2">
+                    {presetsLoading ? (
+                      <p className="text-xs text-gray-400">
+                        Loading presets...
+                      </p>
+                    ) : presets.length === 0 ? (
+                      <p className="text-xs text-gray-400">No presets found.</p>
+                    ) : (
+                      presets
+                        .filter((preset) =>
+                          `${preset.name} ${preset.description ?? ""}`
+                            .toLowerCase()
+                            .includes(createPresetSearch.toLowerCase()),
+                        )
+                        .map((preset) => (
+                          <label
+                            key={preset.id}
+                            className="flex items-start justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+                          >
+                            <div>
+                              <p className="font-semibold text-gray-800">
+                                {preset.name}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {preset.description || "No description"}
+                              </p>
+                              <p className="mt-1 text-[11px] text-gray-400">
+                                {preset.labelIds.length} labels
+                              </p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={selectedPresetIds.includes(preset.id)}
+                              onChange={() =>
+                                toggleSelection(preset.id, setSelectedPresetIds)
+                              }
+                            />
+                          </label>
+                        ))
+                    )}
+                  </div>
+                  {selectedPresetIds.length > 0 && (
+                    <p className="text-xs text-gray-500">
+                      {selectedPresetIds.length} preset(s) selected
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                  >
+                    <span className="text-base leading-none">+</span>
+                    Create Project
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {isDetailOpen &&
+        detailProject &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30 px-4"
+            onClick={(event) =>
+              handleOverlayClick(event, "projectDetails", setIsDetailOpen)
+            }
+          >
+            <div
+              className={`max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl ${
+                closingModals.projectDetails ? "modal-pop-out" : "modal-pop"
+              }`}
+            >
+              <div className="flex items-center justify-between border-b px-4 py-3">
+                <h3 className="text-base font-semibold text-gray-800">
+                  Project details
+                </h3>
+                <button
+                  type="button"
+                  onClick={() =>
+                    closeWithAnimation("projectDetails", setIsDetailOpen)
+                  }
+                  className="text-gray-500 hover:text-gray-700"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
               </div>
 
-              <div className="mt-2 flex flex-col gap-2">
-                {[
-                  {
-                    id: "uploads",
-                    title: `Uploaded images (${uploadedFiles.length})`,
-                    action: "Upload File",
-                    empty: "No images uploaded",
-                    icon: (
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-5 w-5"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <path d="M12 3v12" />
-                        <path d="m7 8 5-5 5 5" />
-                        <path d="M5 21h14" />
-                      </svg>
-                    ),
-                  },
-                  {
-                    id: "annotators",
-                    title: "Assign annotators",
-                    action: "Assign annotators",
-                    empty: "No annotator assigned",
-                    icon: (
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-5 w-5"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <circle cx="9" cy="7" r="3" />
-                        <circle cx="17" cy="7" r="3" />
-                        <path d="M2 21a7 7 0 0 1 14 0" />
-                        <path d="M14 21a5 5 0 0 1 8 0" />
-                      </svg>
-                    ),
-                  },
-                  {
-                    id: "reviewers",
-                    title: "Assign reviewers",
-                    action: "Assign reviewers",
-                    empty: "No reviewer assigned",
-                    icon: (
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-5 w-5"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <circle cx="9" cy="7" r="3" />
-                        <circle cx="17" cy="7" r="3" />
-                        <path d="M2 21a7 7 0 0 1 14 0" />
-                        <path d="M14 21a5 5 0 0 1 8 0" />
-                      </svg>
-                    ),
-                  },
-                  {
-                    id: "presets",
-                    title: "Label Presets",
-                    action: "Add Preset",
-                    empty: "No label preset selected",
-                    icon: (
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-5 w-5"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
-                        <path d="M16 3h5v5" />
-                        <path d="M16 8 21 3" />
-                      </svg>
-                    ),
-                  },
-                ].map((section) => (
-                  <div
-                    key={section.id}
-                    className="rounded-md border border-gray-200 px-2 py-2 shadow-sm"
+              <div className="p-4">
+                <div className="rounded-md border border-gray-200 p-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-base font-semibold text-gray-900">
+                        {detailProject.name}
+                      </h2>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {detailProject.description || "No description provided"}
+                      </p>
+                    </div>
+                    <span className="rounded-md bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                      {detailProject.status}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-md border border-gray-200 p-3">
+                    <p className="text-xs font-semibold text-gray-700">
+                      Assigned Annotator
+                    </p>
+                    <p className="mt-2 text-sm text-gray-800">
+                      {selectedAnnotators.length === 0
+                        ? "Unassigned"
+                        : resolveNames(annotators, selectedAnnotators).join(
+                            ", ",
+                          )}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-gray-200 p-3">
+                    <p className="text-xs font-semibold text-gray-700">
+                      Assigned Reviewer
+                    </p>
+                    <p className="mt-2 text-sm text-gray-800">
+                      {selectedReviewers.length === 0
+                        ? "Unassigned"
+                        : resolveNames(reviewers, selectedReviewers).join(", ")}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-gray-200 p-3">
+                    <p className="text-xs font-semibold text-gray-700">
+                      Selected Preset
+                    </p>
+                    <p className="mt-2 text-sm text-gray-800">
+                      {selectedPreset?.name || "No preset selected"}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-gray-200 p-3">
+                    <p className="text-xs font-semibold text-gray-700">
+                      Uploaded files
+                    </p>
+                    {uploadedFiles.length === 0 ? (
+                      <p className="mt-2 text-xs text-gray-400">
+                        No images uploaded
+                      </p>
+                    ) : (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {uploadedFiles.map((file) => (
+                          <span
+                            key={file}
+                            className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
+                          >
+                            {file}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      closeWithAnimation("projectDetails", setIsDetailOpen)
+                    }
+                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
                   >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {isEditOpen &&
+        activeProject &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 px-3"
+            onClick={(event) =>
+              handleOverlayClick(event, "editProject", setIsEditOpen)
+            }
+          >
+            <div
+              className={`max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-md border border-gray-300 bg-white shadow-xl ${
+                closingModals.editProject ? "modal-pop-out" : "modal-pop"
+              }`}
+            >
+              <div className="relative flex items-center justify-between border-b px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    closeWithAnimation("editProject", setIsEditOpen)
+                  }
+                  className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100"
+                >
+                  ← Go back
+                </button>
+                <h3 className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-gray-800">
+                  Edit project
+                </h3>
+                <button
+                  type="button"
+                  onClick={() =>
+                    closeWithAnimation("editProject", setIsEditOpen)
+                  }
+                  className="text-gray-500 hover:text-gray-700"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-2">
+                <div className="rounded-md border border-gray-200 px-2 py-2 shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-base font-semibold text-gray-900">
+                        {activeProject.name}
+                      </h2>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {activeProject.description ||
+                          "Example Image Classification Example"}
+                      </p>
+                    </div>
+                    <span className="rounded-md bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                      {activeProject.status}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-2 flex flex-col gap-2">
+                  {[
+                    {
+                      id: "uploads",
+                      title: `Uploaded images (${uploadedFiles.length})`,
+                      action: "Upload File",
+                      empty: "No images uploaded",
+                      icon: (
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M12 3v12" />
+                          <path d="m7 8 5-5 5 5" />
+                          <path d="M5 21h14" />
+                        </svg>
+                      ),
+                    },
+                    {
+                      id: "annotators",
+                      title: "Assign annotators",
+                      action: "Assign annotators",
+                      empty: "No annotator assigned",
+                      icon: (
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <circle cx="9" cy="7" r="3" />
+                          <circle cx="17" cy="7" r="3" />
+                          <path d="M2 21a7 7 0 0 1 14 0" />
+                          <path d="M14 21a5 5 0 0 1 8 0" />
+                        </svg>
+                      ),
+                    },
+                    {
+                      id: "reviewers",
+                      title: "Assign reviewers",
+                      action: "Assign reviewers",
+                      empty: "No reviewer assigned",
+                      icon: (
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <circle cx="9" cy="7" r="3" />
+                          <circle cx="17" cy="7" r="3" />
+                          <path d="M2 21a7 7 0 0 1 14 0" />
+                          <path d="M14 21a5 5 0 0 1 8 0" />
+                        </svg>
+                      ),
+                    },
+                    {
+                      id: "presets",
+                      title: "Label Presets",
+                      action: "Add Preset",
+                      empty: "No label preset selected",
+                      icon: (
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
+                          <path d="M16 3h5v5" />
+                          <path d="M16 8 21 3" />
+                        </svg>
+                      ),
+                    },
+                  ].map((section) => (
+                    <div
+                      key={section.id}
+                      className="rounded-md border border-gray-200 px-2 py-2 shadow-sm"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                          {section.icon}
+                          {section.title}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (section.id === "uploads") {
+                              setIsUploadOpen(true);
+                              return;
+                            }
+                            if (section.id === "annotators") {
+                              setAssignSearch("");
+                              setIsAssignAnnotatorsOpen(true);
+                              return;
+                            }
+                            if (section.id === "reviewers") {
+                              setAssignSearch("");
+                              setIsAssignReviewersOpen(true);
+                              return;
+                            }
+                            if (section.id === "presets") {
+                              setPresetSearch("");
+                              setIsSelectPresetOpen(true);
+                            }
+                          }}
+                          className="rounded-md bg-blue-600 px-3 py-1 text-xs font-semibold text-white"
+                        >
+                          {section.action}
+                        </button>
+                      </div>
+                      {section.id === "uploads" ? (
+                        uploadedFiles.length === 0 ? (
+                          <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
+                            {section.empty}
+                          </div>
+                        ) : (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {uploadedFiles.map((file) => (
+                              <span
+                                key={file}
+                                className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
+                              >
+                                {file}
+                              </span>
+                            ))}
+                          </div>
+                        )
+                      ) : section.id === "annotators" ? (
+                        selectedAnnotators.length === 0 ? (
+                          <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
+                            {section.empty}
+                          </div>
+                        ) : (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {resolveNames(annotators, selectedAnnotators).map(
+                              (name) => (
+                                <span
+                                  key={name}
+                                  className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
+                                >
+                                  {name}
+                                </span>
+                              ),
+                            )}
+                          </div>
+                        )
+                      ) : section.id === "reviewers" ? (
+                        selectedReviewers.length === 0 ? (
+                          <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
+                            {section.empty}
+                          </div>
+                        ) : (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {resolveNames(reviewers, selectedReviewers).map(
+                              (name) => (
+                                <span
+                                  key={name}
+                                  className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
+                                >
+                                  {name}
+                                </span>
+                              ),
+                            )}
+                          </div>
+                        )
+                      ) : section.id === "presets" ? (
+                        selectedPreset ? (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700">
+                              {selectedPreset.name}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
+                            {section.empty}
+                          </div>
+                        )
+                      ) : (
+                        <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
+                          {section.empty}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  <div className="rounded-md border border-gray-200 px-2 py-2 shadow-sm">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-                        {section.icon}
-                        {section.title}
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <line x1="8" y1="6" x2="21" y2="6" />
+                          <line x1="8" y1="12" x2="21" y2="12" />
+                          <line x1="8" y1="18" x2="21" y2="18" />
+                          <circle cx="3" cy="6" r="1" />
+                          <circle cx="3" cy="12" r="1" />
+                          <circle cx="3" cy="18" r="1" />
+                        </svg>
+                        Guideline
                       </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (section.id === "uploads") {
-                            setIsUploadOpen(true);
-                            return;
-                          }
-                          if (section.id === "annotators") {
-                            setAssignSearch("");
-                            setSelectedAnnotatorFiles([]);
-                            setIsAssignAnnotatorsOpen(true);
-                            return;
-                          }
-                          if (section.id === "reviewers") {
-                            setAssignSearch("");
-                            setSelectedReviewerFiles([]);
-                            setIsAssignReviewersOpen(true);
-                            return;
-                          }
-                          if (section.id === "presets") {
-                            setPresetSearch("");
-                            setIsSelectPresetOpen(true);
-                          }
-                        }}
-                        className="rounded-md bg-blue-600 px-3 py-1 text-xs font-semibold text-white"
+                        className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700"
                       >
-                        {section.action}
+                        Select file
                       </button>
                     </div>
-                    {section.id === "uploads" ? (
-                      uploadedFiles.length === 0 ? (
-                        <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
-                          {section.empty}
-                        </div>
-                      ) : (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {uploadedFiles.map((file) => (
-                            <span
-                              key={file}
-                              className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
-                            >
-                              {file}
-                            </span>
-                          ))}
-                        </div>
-                      )
-                    ) : section.id === "annotators" ? (
-                      assignedAnnotatorIds.length === 0 ? (
-                        <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
-                          {section.empty}
-                        </div>
-                      ) : (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {resolveNames(annotators, assignedAnnotatorIds).map(
-                            (name) => (
-                              <span
-                                key={name}
-                                className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
-                              >
-                                {name}
-                              </span>
-                            ),
-                          )}
-                        </div>
-                      )
-                    ) : section.id === "reviewers" ? (
-                      !selectedReviewerId ? (
-                        <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
-                          {section.empty}
-                        </div>
-                      ) : (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {resolveNames(reviewers, [selectedReviewerId]).map(
-                            (name) => (
-                              <span
-                                key={name}
-                                className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
-                              >
-                                {name}
-                              </span>
-                            ),
-                          )}
-                        </div>
-                      )
-                    ) : section.id === "presets" ? (
-                      selectedPreset ? (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <span className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700">
-                            {selectedPreset.name}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
-                          {section.empty}
-                        </div>
-                      )
-                    ) : (
-                      <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
-                        {section.empty}
-                      </div>
-                    )}
-                    {section.id === "annotators" &&
-                      Object.keys(annotatorFileAssignments).length > 0 && (
-                        <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-2 text-xs text-gray-700">
-                          <p className="font-semibold text-gray-800">
-                            Assigned files
-                          </p>
-                          <div className="mt-2 flex flex-col gap-1">
-                            {Object.entries(annotatorFileAssignments).map(
-                              ([file, ids]) => (
-                                <span key={file}>
-                                  {file}: {resolveNames(annotators, ids).join(", ")}
-                                </span>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    {section.id === "reviewers" &&
-                      Object.keys(reviewerFileAssignments).length > 0 && (
-                        <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-2 text-xs text-gray-700">
-                          <p className="font-semibold text-gray-800">
-                            Assigned files
-                          </p>
-                          <div className="mt-2 flex flex-col gap-1">
-                            {Object.entries(reviewerFileAssignments).map(
-                              ([file, ids]) => (
-                                <span key={file}>
-                                  {file}: {resolveNames(reviewers, ids).join(", ")}
-                                </span>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      )}
-                  </div>
-                ))}
-
-                <div className="rounded-md border border-gray-200 px-2 py-2 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-5 w-5"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <line x1="8" y1="6" x2="21" y2="6" />
-                        <line x1="8" y1="12" x2="21" y2="12" />
-                        <line x1="8" y1="18" x2="21" y2="18" />
-                        <circle cx="3" cy="6" r="1" />
-                        <circle cx="3" cy="12" r="1" />
-                        <circle cx="3" cy="18" r="1" />
-                      </svg>
-                      Guideline
+                    <div className="mt-2 flex flex-col gap-2">
+                      <input
+                        className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                        placeholder="guideline name"
+                      />
+                      <textarea
+                        className="min-h-[56px] rounded-md border border-gray-300 px-3 py-2 text-sm"
+                        placeholder="guideline description"
+                      />
                     </div>
-                    <button
-                      type="button"
-                      className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700"
-                    >
-                      Select file
-                    </button>
-                  </div>
-                  <div className="mt-2 flex flex-col gap-2">
-                    <input
-                      className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                      placeholder="guideline name"
-                    />
-                    <textarea
-                      className="min-h-[56px] rounded-md border border-gray-300 px-3 py-2 text-sm"
-                      placeholder="guideline description"
-                    />
                   </div>
                 </div>
-              </div>
 
-              <div className="sticky bottom-0 mt-3 flex flex-wrap justify-end gap-2 border-t bg-white pt-3">
-                <button
-                  type="button"
-                  onClick={() => closeWithAnimation("editProject", setIsEditOpen)}
-                  className="rounded-md bg-red-500 px-3 py-2 text-sm font-semibold text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveAsDraft}
-                  className="rounded-md bg-gray-200 px-3 py-2 text-sm font-semibold text-gray-700"
-                >
-                  Safe as drafted
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmAssigned}
-                  className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
-                >
-                  Confirm as assigned
-                </button>
+                <div className="sticky bottom-0 mt-3 flex flex-wrap justify-end gap-2 border-t bg-white pt-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      closeWithAnimation("editProject", setIsEditOpen)
+                    }
+                    className="rounded-md bg-red-500 px-3 py-2 text-sm font-semibold text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveAsDraft}
+                    className="rounded-md bg-gray-200 px-3 py-2 text-sm font-semibold text-gray-700"
+                  >
+                    Safe as drafted
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmAssigned}
+                    className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
+                  >
+                    Confirm as assigned
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      , document.body)}
+          </div>,
+          document.body,
+        )}
 
-      {isUploadOpen && createPortal(
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 px-4"
-          onClick={(event) => handleOverlayClick(event, "upload", setIsUploadOpen)}
-        >
+      {isUploadOpen &&
+        createPortal(
           <div
-            className={`max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl ${
-              closingModals.upload ? "modal-pop-out" : "modal-pop"
-            }`}
+            className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 px-4"
+            onClick={(event) =>
+              handleOverlayClick(event, "upload", setIsUploadOpen)
+            }
           >
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <h3 className="text-base font-semibold text-gray-800">Upload Images</h3>
-              <button
-                type="button"
-                onClick={() => closeWithAnimation("upload", setIsUploadOpen)}
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-4">
-              <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 px-4 py-6 text-center">
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-8 w-8 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M12 3v12" />
-                  <path d="m7 8 5-5 5 5" />
-                  <path d="M5 21h14" />
-                </svg>
-                <p className="mt-3 text-sm font-semibold text-gray-700">
-                  Drop files here or click to upload
-                </p>
-                <p className="mt-1 text-xs text-gray-400">
-                  {selectedUploadFiles.length > 0
-                    ? `${selectedUploadFiles.length} file(s) selected`
-                    : "Support for image files (JPG, PNG, etc)"}
-                </p>
+            <div
+              className={`max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl ${
+                closingModals.upload ? "modal-pop-out" : "modal-pop"
+              }`}
+            >
+              <div className="flex items-center justify-between border-b px-4 py-3">
+                <h3 className="text-base font-semibold text-gray-800">
+                  Upload Images
+                </h3>
                 <button
                   type="button"
-                  onClick={() => uploadInputRef.current?.click()}
-                  className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-blue-700"
+                  onClick={() => closeWithAnimation("upload", setIsUploadOpen)}
+                  className="text-gray-500 hover:text-gray-700"
+                  aria-label="Close"
                 >
-                  Select Files
-                </button>
-                <input
-                  ref={uploadInputRef}
-                  type="file"
-                  title="Upload project files"
-                  accept="image/*"
-                  multiple
-                  onChange={handleUploadFileChange}
-                  className="hidden"
-                />
-              </div>
-
-              <div className="mt-4">
-                <input
-                  value={uploadName}
-                  onChange={(event) => setUploadName(event.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="New file name(optional)"
-                />
-              </div>
-
-              <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleConfirmUpload}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-                >
-                  Confirm upload
+                  ✕
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      , document.body)}
 
-      {isAssignAnnotatorsOpen && createPortal(
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 px-4"
-          onClick={(event) =>
-            handleOverlayClick(event, "assignAnnotators", setIsAssignAnnotatorsOpen)
-          }
-        >
-          <div
-            className={`max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl ${
-              closingModals.assignAnnotators ? "modal-pop-out" : "modal-pop"
-            }`}
-          >
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <h3 className="text-lg font-semibold text-gray-800">Assign annotators</h3>
-              <button
-                type="button"
-                onClick={() =>
-                  closeWithAnimation("assignAnnotators", setIsAssignAnnotatorsOpen)
-                }
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-4">
-              <input
-                value={assignSearch}
-                onChange={(event) => setAssignSearch(event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                placeholder="Search annotators"
-              />
-
-              <div className="mt-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-800">
-                    Assign Annotators
+              <div className="p-4">
+                <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 px-4 py-6 text-center">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-8 w-8 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M12 3v12" />
+                    <path d="m7 8 5-5 5 5" />
+                    <path d="M5 21h14" />
+                  </svg>
+                  <p className="mt-3 text-sm font-semibold text-gray-700">
+                    Drop files here or click to upload
+                  </p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {selectedUploadFiles.length > 0
+                      ? `${selectedUploadFiles.length} file(s) selected`
+                      : "Support for image files (JPG, PNG, etc)"}
                   </p>
                   <button
                     type="button"
-                    onClick={() => setSelectedAnnotatorId(null)}
-                    className="text-xs font-semibold text-gray-500 hover:text-gray-700"
+                    onClick={() => uploadInputRef.current?.click()}
+                    className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-blue-700"
                   >
-                    Clear
+                    Select Files
                   </button>
+                  <input
+                    ref={uploadInputRef}
+                    type="file"
+                    title="Upload project files"
+                    accept="image/*"
+                    multiple
+                    onChange={handleUploadFileChange}
+                    className="hidden"
+                  />
                 </div>
-                <div className="mt-2 space-y-2 rounded-md border border-gray-300 p-3">
-                  {annotators
-                    .filter((member) =>
-                      `${member.name} ${member.email}`
-                        .toLowerCase()
-                        .includes(assignSearch.toLowerCase()),
-                    )
-                    .map((member) => (
-                      <label
-                        key={member.id}
-                        className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
-                      >
-                        <div>
-                          <p className="font-semibold text-gray-800">
-                            {member.name}
-                          </p>
-                          <p className="text-xs text-gray-500">{member.email}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-gray-500">
-                            {member.workload}
-                          </span>
-                          <input
-                            type="radio"
-                            name="selected-annotator"
-                            checked={selectedAnnotatorId === member.id}
-                            onChange={() => setSelectedAnnotatorId(member.id)}
-                          />
-                        </div>
-                      </label>
-                    ))}
-                </div>
-              </div>
 
-              <div className="mt-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-800">
-                    Assign to files
-                  </p>
+                <div className="mt-4">
+                  <input
+                    value={uploadName}
+                    onChange={(event) => setUploadName(event.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="New file name(optional)"
+                  />
+                </div>
+
+                <div className="mt-4 flex justify-end">
                   <button
                     type="button"
-                    onClick={() => setSelectedAnnotatorFiles([])}
-                    className="text-xs font-semibold text-gray-500 hover:text-gray-700"
+                    onClick={handleConfirmUpload}
+                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
                   >
-                    Clear files
+                    Confirm upload
                   </button>
                 </div>
-                <div className="mt-2 space-y-2 rounded-md border border-gray-300 p-3">
-                  {uploadedFiles.length === 0 ? (
-                    <p className="text-xs text-gray-400">
-                      No files uploaded yet.
-                    </p>
-                  ) : (
-                    uploadedFiles.map((file) => (
-                      <label
-                        key={file}
-                        className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
-                      >
-                        <span className="truncate">{file}</span>
-                        <input
-                          type="checkbox"
-                          checked={selectedAnnotatorFiles.includes(file)}
-                          onChange={() =>
-                            toggleSelection(file, setSelectedAnnotatorFiles)
-                          }
-                        />
-                      </label>
-                    ))
-                  )}
-                </div>
               </div>
+            </div>
+          </div>,
+          document.body,
+        )}
 
-              <div className="mt-4 flex justify-end">
+      {isAssignAnnotatorsOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 px-4"
+            onClick={(event) =>
+              handleOverlayClick(
+                event,
+                "assignAnnotators",
+                setIsAssignAnnotatorsOpen,
+              )
+            }
+          >
+            <div
+              className={`max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl ${
+                closingModals.assignAnnotators ? "modal-pop-out" : "modal-pop"
+              }`}
+            >
+              <div className="flex items-center justify-between border-b px-4 py-3">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Assign annotators
+                </h3>
                 <button
                   type="button"
-                  onClick={() => {
-                    applyAssignments(
-                      selectedAnnotatorFiles,
-                      selectedAnnotatorId ? [selectedAnnotatorId] : [],
-                      setAnnotatorFileAssignments,
-                    );
-                    setSelectedAnnotatorFiles([]);
+                  onClick={() =>
                     closeWithAnimation(
                       "assignAnnotators",
                       setIsAssignAnnotatorsOpen,
-                    );
-                  }}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                    )
+                  }
+                  className="text-gray-500 hover:text-gray-700"
+                  aria-label="Close"
                 >
-                  Confirm assign
+                  ✕
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      , document.body)}
+              <div className="p-4">
+                <input
+                  value={assignSearch}
+                  onChange={(event) => setAssignSearch(event.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="Search annotators"
+                />
 
-      {isAssignReviewersOpen && createPortal(
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 px-4"
-          onClick={(event) =>
-            handleOverlayClick(event, "assignReviewers", setIsAssignReviewersOpen)
-          }
-        >
-          <div
-            className={`max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl ${
-              closingModals.assignReviewers ? "modal-pop-out" : "modal-pop"
-            }`}
-          >
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <h3 className="text-lg font-semibold text-gray-800">Assign reviewers</h3>
-              <button
-                type="button"
-                onClick={() =>
-                  closeWithAnimation("assignReviewers", setIsAssignReviewersOpen)
-                }
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-4">
-              <input
-                value={assignSearch}
-                onChange={(event) => setAssignSearch(event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                placeholder="Search reviewers"
-              />
-
-              <div className="mt-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-800">
-                    Assign reviewers
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedReviewerId(null)}
-                    className="text-xs font-semibold text-gray-500 hover:text-gray-700"
-                  >
-                    Clear
-                  </button>
-                </div>
-                <div className="mt-2 space-y-2 rounded-md border border-gray-300 p-3">
-                  {reviewers
-                    .filter((member) =>
-                      `${member.name} ${member.email}`
-                        .toLowerCase()
-                        .includes(assignSearch.toLowerCase()),
-                    )
-                    .map((member) => (
-                      <label
-                        key={member.id}
-                        className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
-                      >
-                        <div>
-                          <p className="font-semibold text-gray-800">
-                            {member.name}
-                          </p>
-                          <p className="text-xs text-gray-500">{member.email}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-gray-500">
-                            {member.workload}
-                          </span>
-                          <input
-                            type="radio"
-                            name="selected-reviewer"
-                            checked={selectedReviewerId === member.id}
-                            onChange={() => setSelectedReviewerId(member.id)}
-                          />
-                        </div>
-                      </label>
-                    ))}
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-800">
-                    Assign to files
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedReviewerFiles([])}
-                    className="text-xs font-semibold text-gray-500 hover:text-gray-700"
-                  >
-                    Clear files
-                  </button>
-                </div>
-                <div className="mt-2 space-y-2 rounded-md border border-gray-300 p-3">
-                  {uploadedFiles.length === 0 ? (
-                    <p className="text-xs text-gray-400">
-                      No files uploaded yet.
+                <div className="mt-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-gray-800">
+                      Assign Annotators
                     </p>
-                  ) : (
-                    uploadedFiles.map((file) => (
-                      <label
-                        key={file}
-                        className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
-                      >
-                        <span className="truncate">{file}</span>
-                        <input
-                          type="checkbox"
-                          checked={selectedReviewerFiles.includes(file)}
-                          onChange={() =>
-                            toggleSelection(file, setSelectedReviewerFiles)
-                          }
-                        />
-                      </label>
-                    ))
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAnnotators([])}
+                      className="text-xs font-semibold text-gray-500 hover:text-gray-700"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="mt-2 space-y-2 rounded-md border border-gray-300 p-3">
+                    {annotators
+                      .filter((member) =>
+                        `${member.name} ${member.email}`
+                          .toLowerCase()
+                          .includes(assignSearch.toLowerCase()),
+                      )
+                      .map((member) => (
+                        <label
+                          key={member.id}
+                          className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+                        >
+                          <div>
+                            <p className="font-semibold text-gray-800">
+                              {member.name}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {member.email}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-gray-500">
+                              {member.workload}
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={selectedAnnotators.includes(member.id)}
+                              onChange={() =>
+                                toggleSelection(
+                                  member.id,
+                                  setSelectedAnnotators,
+                                )
+                              }
+                            />
+                          </div>
+                        </label>
+                      ))}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      closeWithAnimation(
+                        "assignAnnotators",
+                        setIsAssignAnnotatorsOpen,
+                      )
+                    }
+                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                  >
+                    Confirm assign
+                  </button>
                 </div>
               </div>
+            </div>
+          </div>,
+          document.body,
+        )}
 
-              <div className="mt-4 flex justify-end">
+      {isAssignReviewersOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 px-4"
+            onClick={(event) =>
+              handleOverlayClick(
+                event,
+                "assignReviewers",
+                setIsAssignReviewersOpen,
+              )
+            }
+          >
+            <div
+              className={`max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl ${
+                closingModals.assignReviewers ? "modal-pop-out" : "modal-pop"
+              }`}
+            >
+              <div className="flex items-center justify-between border-b px-4 py-3">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Assign reviewers
+                </h3>
                 <button
                   type="button"
-                  onClick={() => {
-                    applyAssignments(
-                      selectedReviewerFiles,
-                      selectedReviewerId ? [selectedReviewerId] : [],
-                      setReviewerFileAssignments,
-                    );
-                    setSelectedReviewerFiles([]);
+                  onClick={() =>
                     closeWithAnimation(
                       "assignReviewers",
                       setIsAssignReviewersOpen,
-                    );
-                  }}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                    )
+                  }
+                  className="text-gray-500 hover:text-gray-700"
+                  aria-label="Close"
                 >
-                  Confirm assign
+                  ✕
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      , document.body)}
+              <div className="p-4">
+                <input
+                  value={assignSearch}
+                  onChange={(event) => setAssignSearch(event.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="Search reviewers"
+                />
 
-      {isSelectPresetOpen && createPortal(
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 px-4"
-          onClick={(event) =>
-            handleOverlayClick(event, "selectPreset", setIsSelectPresetOpen)
-          }
-        >
-          <div
-            className={`max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl ${
-              closingModals.selectPreset ? "modal-pop-out" : "modal-pop"
-            }`}
-          >
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <h3 className="text-lg font-semibold text-gray-800">Select preset</h3>
-              <button
-                type="button"
-                onClick={() => closeWithAnimation("selectPreset", setIsSelectPresetOpen)}
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-4">
-              <input
-                value={presetSearch}
-                onChange={(event) => setPresetSearch(event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                placeholder="Search presets"
-              />
-
-              <div className="mt-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-800">Selected Preset</p>
-                  <span className="text-xs text-gray-500">
-                    Only created presets are listed
-                  </span>
-                </div>
-                <div className="mt-2 space-y-2 rounded-md border border-gray-300 p-3">
-                  {presets.length === 0 ? (
-                    <span className="text-xs text-gray-400">No presets available</span>
-                  ) : presets.filter((preset) =>
-                      `${preset.name} ${preset.description ?? ""}`
-                        .toLowerCase()
-                        .includes(presetSearch.toLowerCase()),
-                    ).length === 0 ? (
-                    <span className="text-xs text-gray-400">No matching preset</span>
-                  ) : (
-                    presets
-                      .filter((preset) =>
-                        `${preset.name} ${preset.description ?? ""}`
+                <div className="mt-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-gray-800">
+                      Assign reviewers
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedReviewers([])}
+                      className="text-xs font-semibold text-gray-500 hover:text-gray-700"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="mt-2 space-y-2 rounded-md border border-gray-300 p-3">
+                    {reviewers
+                      .filter((member) =>
+                        `${member.name} ${member.email}`
                           .toLowerCase()
-                          .includes(presetSearch.toLowerCase()),
+                          .includes(assignSearch.toLowerCase()),
                       )
-                      .map((preset) => (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => setSelectedPreset(preset)}
-                        className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm ${
-                          selectedPreset?.id === preset.id
-                            ? "border-blue-500 bg-blue-50 text-blue-700"
-                            : "border-gray-200 bg-white text-gray-700"
-                        }`}
-                      >
-                        <div>
-                          <p className="font-semibold">{preset.name}</p>
-                          <p className="text-xs text-gray-500">
-                            {preset.description}
-                          </p>
-                        </div>
-                        {selectedPreset?.id === preset.id && (
-                          <span className="text-xs font-semibold">Selected</span>
-                        )}
-                      </button>
-                    ))
-                  )}
+                      .map((member) => (
+                        <label
+                          key={member.id}
+                          className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+                        >
+                          <div>
+                            <p className="font-semibold text-gray-800">
+                              {member.name}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {member.email}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-gray-500">
+                              {member.workload}
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={selectedReviewers.includes(member.id)}
+                              onChange={() =>
+                                toggleSelection(member.id, setSelectedReviewers)
+                              }
+                            />
+                          </div>
+                        </label>
+                      ))}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      closeWithAnimation(
+                        "assignReviewers",
+                        setIsAssignReviewersOpen,
+                      )
+                    }
+                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                  >
+                    Confirm assign
+                  </button>
                 </div>
               </div>
+            </div>
+          </div>,
+          document.body,
+        )}
 
-              <div className="mt-4 flex justify-end">
+      {isSelectPresetOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 px-4"
+            onClick={(event) =>
+              handleOverlayClick(event, "selectPreset", setIsSelectPresetOpen)
+            }
+          >
+            <div
+              className={`max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-xl ${
+                closingModals.selectPreset ? "modal-pop-out" : "modal-pop"
+              }`}
+            >
+              <div className="flex items-center justify-between border-b px-4 py-3">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Select preset
+                </h3>
                 <button
                   type="button"
-                  onClick={() => closeWithAnimation("selectPreset", setIsSelectPresetOpen)}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                  onClick={() =>
+                    closeWithAnimation("selectPreset", setIsSelectPresetOpen)
+                  }
+                  className="text-gray-500 hover:text-gray-700"
+                  aria-label="Close"
                 >
-                  Confirm assign
+                  ✕
                 </button>
               </div>
+              <div className="p-4">
+                <input
+                  value={presetSearch}
+                  onChange={(event) => setPresetSearch(event.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="Search presets"
+                />
+
+                <div className="mt-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-gray-800">
+                      Selected Preset
+                    </p>
+                    <span className="text-xs text-gray-500">
+                      Only created presets are listed
+                    </span>
+                  </div>
+                  <div className="mt-2 space-y-2 rounded-md border border-gray-300 p-3">
+                    {presets.filter((preset) => {
+                      const keyword = presetSearch.toLowerCase();
+                      return (
+                        preset.name.toLowerCase().includes(keyword) ||
+                        (preset.description ?? "")
+                          .toLowerCase()
+                          .includes(keyword)
+                      );
+                    }).length === 0 ? (
+                      <span className="text-xs text-gray-400">
+                        No presets available
+                      </span>
+                    ) : (
+                      presets
+                        .filter((preset) => {
+                          const keyword = presetSearch.toLowerCase();
+                          return (
+                            preset.name.toLowerCase().includes(keyword) ||
+                            (preset.description ?? "")
+                              .toLowerCase()
+                              .includes(keyword)
+                          );
+                        })
+                        .map((preset) => (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => setSelectedPreset(preset)}
+                            className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm ${
+                              selectedPreset?.id === preset.id
+                                ? "border-blue-500 bg-blue-50 text-blue-700"
+                                : "border-gray-200 bg-white text-gray-700"
+                            }`}
+                          >
+                            <div>
+                              <p className="font-semibold">{preset.name}</p>
+                              <p className="text-xs text-gray-500">
+                                {preset.description}
+                              </p>
+                            </div>
+                            {selectedPreset?.id === preset.id && (
+                              <span className="text-xs font-semibold">
+                                Selected
+                              </span>
+                            )}
+                          </button>
+                        ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      closeWithAnimation("selectPreset", setIsSelectPresetOpen)
+                    }
+                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                  >
+                    Confirm assign
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      , document.body)}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

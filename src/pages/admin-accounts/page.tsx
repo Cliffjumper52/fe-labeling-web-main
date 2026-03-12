@@ -5,6 +5,14 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
+import { toast } from "sonner";
+import {
+  createAdminAccount,
+  deleteAdminAccount,
+  fetchAdminAccounts,
+  hasBackendConfig,
+  updateAdminAccount,
+} from "../../services/admin-service";
 
 type AdminUser = {
   id: string;
@@ -63,6 +71,7 @@ const readUsersFromStorage = (): AdminUser[] => {
 
 export default function AdminAccountsPage() {
   const [users, setUsers] = useState<AdminUser[]>(() => readUsersFromStorage());
+  const [isLoading, setIsLoading] = useState(false);
   const hasUsers = users.length > 0;
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [newUserName, setNewUserName] = useState("");
@@ -86,25 +95,74 @@ export default function AdminAccountsPage() {
     {},
   );
 
-  const handleCreateUser = (event: FormEvent) => {
+  const handleCreateUser = async (event: FormEvent) => {
     event.preventDefault();
-    setUsers((prev) => [
-      {
-        id: crypto.randomUUID(),
-        name: newUserName.trim() || "Unnamed User",
-        email: newUserEmail.trim(),
-        role: newUserRole,
-        status: "Active",
-        phone: newUserPhone.trim(),
-      },
-      ...prev,
-    ]);
+    const payload: AdminUser = {
+      id: crypto.randomUUID(),
+      name: newUserName.trim() || "Unnamed User",
+      email: newUserEmail.trim(),
+      role: newUserRole,
+      status: "Active",
+      phone: newUserPhone.trim(),
+    };
+
+    try {
+      if (hasBackendConfig()) {
+        const created = await createAdminAccount({
+          name: payload.name,
+          email: payload.email,
+          role: payload.role,
+          status: payload.status,
+          phone: payload.phone,
+        });
+        setUsers((prev) => [created as AdminUser, ...prev]);
+      } else {
+        setUsers((prev) => [payload, ...prev]);
+      }
+      toast.success("User created successfully.");
+    } catch {
+      toast.error("Create user failed.");
+      return;
+    }
+
     setIsCreateUserOpen(false);
     setNewUserName("");
     setNewUserEmail("");
     setNewUserRole("Annotator");
     setNewUserPhone("");
   };
+
+  useEffect(() => {
+    if (!hasBackendConfig()) {
+      return;
+    }
+
+    let mounted = true;
+    setIsLoading(true);
+
+    const loadUsers = async () => {
+      try {
+        const remoteUsers = await fetchAdminAccounts();
+        if (mounted && remoteUsers.length > 0) {
+          setUsers(remoteUsers as AdminUser[]);
+        }
+      } catch {
+        if (mounted) {
+          toast.error("Failed to load accounts from API.");
+        }
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadUsers();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(ADMIN_USERS_STORAGE_KEY, JSON.stringify(users));
@@ -126,8 +184,16 @@ export default function AdminAccountsPage() {
     }, 200);
   };
 
-  const handleDeleteUser = (userId: string) => {
-    setUsers((prev) => prev.filter((user) => user.id !== userId));
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      if (hasBackendConfig()) {
+        await deleteAdminAccount(userId);
+      }
+      setUsers((prev) => prev.filter((user) => user.id !== userId));
+      toast.success("User deleted.");
+    } catch {
+      toast.error("Delete user failed.");
+    }
   };
 
   const resetEditForm = () => {
@@ -149,25 +215,46 @@ export default function AdminAccountsPage() {
     setIsEditUserOpen(true);
   };
 
-  const handleUpdateUser = (event: FormEvent) => {
+  const handleUpdateUser = async (event: FormEvent) => {
     event.preventDefault();
     if (!editingUserId) {
       return;
     }
-    setUsers((prev) =>
-      prev.map((user) =>
-        user.id === editingUserId
-          ? {
-              ...user,
-              name: editUserName.trim() || "Unnamed User",
-              email: editUserEmail.trim(),
-              role: editUserRole,
-              status: editUserStatus,
-              phone: editUserPhone.trim(),
-            }
-          : user,
-      ),
-    );
+
+    const updatedPayload = {
+      name: editUserName.trim() || "Unnamed User",
+      email: editUserEmail.trim(),
+      role: editUserRole,
+      status: editUserStatus,
+      phone: editUserPhone.trim(),
+    };
+
+    try {
+      if (hasBackendConfig()) {
+        const remoteUpdated = await updateAdminAccount(editingUserId, updatedPayload);
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.id === editingUserId ? (remoteUpdated as AdminUser) : user,
+          ),
+        );
+      } else {
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.id === editingUserId
+              ? {
+                  ...user,
+                  ...updatedPayload,
+                }
+              : user,
+          ),
+        );
+      }
+      toast.success("User updated.");
+    } catch {
+      toast.error("Update user failed.");
+      return;
+    }
+
     setIsEditUserOpen(false);
     resetEditForm();
   };
@@ -187,6 +274,12 @@ export default function AdminAccountsPage() {
       </div>
 
       <div className="mb-4 h-px w-full bg-gray-200" />
+
+      {isLoading && (
+        <div className="mb-4 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+          Loading accounts from API...
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <div className="flex flex-col gap-1">
@@ -211,7 +304,10 @@ export default function AdminAccountsPage() {
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Role</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <select
+            title="Filter by role"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>All</option>
             <option>Admin</option>
             <option>Manager</option>
@@ -222,7 +318,10 @@ export default function AdminAccountsPage() {
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Status</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <select
+            title="Filter by status"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>All</option>
             <option>Active</option>
             <option>Suspended</option>
@@ -231,7 +330,10 @@ export default function AdminAccountsPage() {
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Order by</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <select
+            title="Order users"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>Name</option>
             <option>Date created</option>
             <option>Updated</option>
@@ -380,6 +482,7 @@ export default function AdminAccountsPage() {
                   onChange={(event) =>
                     setNewUserRole(event.target.value as AdminUser["role"])
                   }
+                  title="New user role"
                   className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                   required
                 >
@@ -492,6 +595,7 @@ export default function AdminAccountsPage() {
                   onChange={(event) =>
                     setEditUserRole(event.target.value as AdminUser["role"])
                   }
+                  title="Edit user role"
                   className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                   required
                 >
@@ -509,6 +613,7 @@ export default function AdminAccountsPage() {
                   onChange={(event) =>
                     setEditUserStatus(event.target.value as AdminUser["status"])
                   }
+                  title="Edit user status"
                   className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                   required
                 >
