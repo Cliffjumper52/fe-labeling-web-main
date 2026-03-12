@@ -1,6 +1,6 @@
-import { AnswerDataDto } from "../../checklist-answer/dtos/answer-data/answer-data.dto";
+import type { AnswerDataDto } from "../../checklist-answer/dtos/answer-data/answer-data.dto";
 import { Decision } from "../enums/decisions.enums";
-import { SubmitReviewErrorDto } from "./submit-review-error.dto";
+import type { SubmitReviewErrorDto } from "./submit-review-error.dto";
 
 export interface SubmitReviewsDto {
   decision: Decision;

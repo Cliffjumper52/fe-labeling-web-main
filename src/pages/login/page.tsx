@@ -3,25 +3,42 @@ import { login } from "../../services/auth-service.service";
 import LoginForm from "../../components/login/login-form";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { setAuthTokens } from "../../utils/auth-storage";
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (email: string, password: string) => {
-    console.log(email, password);
     setIsLoading(true);
     try {
-      const result = await login(email, password);
-      const accessToken = result?.data?.accessToken;
-      const refreshToken = result?.data?.refreshToken;
-      const role = result?.data?.user?.role;
-      const username = result?.data?.user?.username ?? email;
-      if (accessToken) localStorage.setItem("accessToken", accessToken);
+      const result = await login(email.trim(), password);
+      const payload = result?.data?.data ?? result?.data ?? result;
+      const accessToken = payload?.accessToken;
+      const refreshToken = payload?.refreshToken;
 
+      if (!accessToken) {
+        throw new Error("Missing access token");
+      }
+
+      // Extract role from JWT payload (base64url-encoded middle segment)
+      let role: string | undefined =
+        payload?.user?.role ?? payload?.account?.role;
+      if (!role) {
+        try {
+          const jwtPayload = JSON.parse(atob(accessToken.split(".")[1]));
+          role = jwtPayload.role;
+        } catch {
+          // ignore decode errors
+        }
+      }
+
+      // Persist tokens to cookies (read by axios interceptor)
+      setAuthTokens(accessToken, refreshToken);
+      // Also keep in localStorage for backward compat
+      localStorage.setItem("accessToken", accessToken);
       if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
-      localStorage.setItem("currentUserName", username);
-      if (role) localStorage.setItem("currentUserRole", role);
+
       toast.success("Login successful");
       if (role === "admin") {
         navigate("/admin");
@@ -32,9 +49,8 @@ export default function LoginPage() {
       } else {
         navigate("/annotator");
       }
-    } catch (error) {
-      console.log(error);
-      toast.error("Login failed");
+    } catch {
+      toast.error("Login failed. Check email/password or backend status.");
     } finally {
       setIsLoading(false);
     }
@@ -53,8 +69,8 @@ export default function LoginPage() {
             <div>
               <h2>Enterprise-grade labeling operations</h2>
               <p>
-                Track projects, label taxonomies, and preset templates across
-                teams in a single control room designed for scale.
+                Track projects, label taxonomies, and preset templates across teams
+                in a single control room designed for scale.
               </p>
             </div>
 
@@ -85,8 +101,8 @@ export default function LoginPage() {
             </div>
 
             <p>
-              Signed-in roles automatically route to admin, manager, or
-              annotator workspaces.
+              Signed-in roles automatically route to admin, manager, or annotator
+              workspaces.
             </p>
           </aside>
 
@@ -99,8 +115,7 @@ export default function LoginPage() {
               <LoginForm onLogin={handleLogin} isLoading={isLoading} />
 
               <div className="login-demo-hint">
-                Demo: admin@gmail.com / manager@gmail.com / annotator@gmail.com
-                / reviewer@gmail.com (password: 123)
+                Demo: admin@gmail.com / manager@gmail.com / annotator@gmail.com / reviewer@gmail.com (password: 123)
               </div>
             </div>
 

@@ -1,48 +1,104 @@
 import axios from "axios";
 import { refreshToken } from "../services/auth-service.service";
+import {
+  clearAuthTokens,
+  getAccessToken,
+  setAuthTokens as persistAuthTokens,
+} from "../utils/auth-storage";
 
-import Cookies from "js-cookie";
+const baseURL = import.meta.env.DEV
+  ? `/${import.meta.env.VITE_PUBLIC_BACKEND_PREFIX}/${import.meta.env.VITE_PUBLIC_BACKEND_VERSION}`
+  : `${import.meta.env.VITE_PUBLIC_BACKEND_URL}/${import.meta.env.VITE_PUBLIC_BACKEND_PREFIX}/${import.meta.env.VITE_PUBLIC_BACKEND_VERSION}`;
+
 const api = axios.create({
-  baseURL: `${import.meta.env.VITE_PUBLIC_BACKEND_URL}/${import.meta.env.VITE_PUBLIC_BACKEND_PREFIX}/${import.meta.env.VITE_PUBLIC_BACKEND_VERSION}`,
-  withCredentials: true, //use cookies token
-});
-
-const refreshApi = axios.create({
-  baseURL: `${import.meta.env.VITE_PUBLIC_BACKEND_URL}/${import.meta.env.VITE_PUBLIC_BACKEND_PREFIX}/${import.meta.env.VITE_PUBLIC_BACKEND_VERSION}`,
+  baseURL,
   withCredentials: true,
 });
 
-// Request Interceptor
+const refreshApi = axios.create({
+  baseURL,
+  withCredentials: true,
+});
+
+// Request Interceptor – attach Bearer token when available
 api.interceptors.request.use(
-  (config) => config,
+  (config) => {
+    const token = getAccessToken();
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
   (error) => Promise.reject(error),
 );
 
-// Response Interceptor
+refreshApi.interceptors.request.use(
+  (config) => {
+    const token = getAccessToken();
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
+// Response Interceptor – auto-refresh on 401 & retry original request
+let isRefreshing = false;
+let pendingQueue: Array<{
+  resolve: (value?: unknown) => void;
+  reject: (reason?: unknown) => void;
+}> = [];
+
+const processQueue = (error: unknown) => {
+  for (const p of pendingQueue) {
+    if (error) {
+      p.reject(error);
+    } else {
+      p.resolve();
+    }
+  }
+  pendingQueue = [];
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    console.log("API Error:", {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      url: error.config?.url,
-      method: error.config?.method,
-      headers: error.config?.headers,
-    });
+    const originalRequest = error.config;
 
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          pendingQueue.push({ resolve, reject });
+        }).then(() => api(originalRequest));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
       try {
         const result = await refreshToken();
         const resultData = result?.data;
         const newAccessToken = resultData?.accessToken;
         const newRefreshToken = resultData?.refreshToken;
 
-        if (newAccessToken) Cookies.set("accessToken", newAccessToken);
-        if (newRefreshToken) Cookies.set("refreshToken", newRefreshToken);
-      } catch (error) {
-        // Handle token refresh failure (e.g., redirect to login);
-        window.location.href = "/login";
+        persistAuthTokens(newAccessToken, newRefreshToken);
+        processQueue(null);
+
+        // Retry the original request with the new token
+        if (newAccessToken && originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        }
+        return api(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError);
+        clearAuthTokens();
+        if (window.location.pathname !== "/login") {
+          window.location.assign("/login");
+        }
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
     return Promise.reject(error);

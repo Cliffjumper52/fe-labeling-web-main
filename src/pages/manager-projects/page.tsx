@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -9,10 +8,14 @@ import {
   type MouseEvent,
   type SetStateAction,
 } from "react";
-import { Link } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { saveFilesToImageStore, type StoredImageRef } from "../../utils/image-store";
+import {
+  createAdminProject,
+  deleteAdminProject,
+  fetchAdminProjects,
+  hasBackendConfig,
+} from "../../services/admin-service";
 
 type Project = {
   id: string;
@@ -21,12 +24,6 @@ type Project = {
   status: "Drafting" | "Active" | "Archived";
   dataType: "Image" | "Video" | "Text" | "Audio";
   createdAt: string;
-  uploadedFiles?: string[];
-  selectedPreset?: Preset | null;
-  assignedAnnotatorIds?: string[];
-  assignedReviewerIds?: string[];
-  annotatorFileAssignments?: Record<string, string[]>;
-  reviewerFileAssignments?: Record<string, string[]>;
 };
 
 type Preset = {
@@ -49,55 +46,12 @@ type UploadedImage = {
   dataUrl: string;
 };
 
-type UploadImageFile = {
-  name: string;
-  file: File;
-};
-
-const createImagePlaceholderDataUrl = (label: string) => {
-  const safe = encodeURIComponent(label);
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360'><rect width='100%' height='100%' fill='#f3f4f6'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#374151' font-size='20' font-family='Arial, sans-serif'>${safe}</text></svg>`;
-  return `data:image/svg+xml;utf8,${svg}`;
-};
-
-const toLightweightImages = (images: UploadedImage[]) => {
-  return images.map((image) => ({
-    name: image.name,
-    dataUrl: createImagePlaceholderDataUrl(image.name),
-  }));
-};
-
-const compactUnknownImages = (value: unknown): UploadedImage[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .map((item) => {
-      if (typeof item !== "object" || item === null) {
-        return null;
-      }
-
-      const raw = item as { name?: unknown };
-      if (typeof raw.name !== "string") {
-        return null;
-      }
-
-      return {
-        name: raw.name,
-        dataUrl: createImagePlaceholderDataUrl(raw.name),
-      };
-    })
-    .filter((item): item is UploadedImage => item !== null);
-};
-
 const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
 const ANNOTATOR_TASKS_UPDATED_EVENT = "annotator-tasks-updated";
 const ADMIN_USERS_STORAGE_KEY = "admin-users";
 const ADMIN_USERS_UPDATED_EVENT = "admin-users-updated";
 const MANAGER_PRESETS_STORAGE_KEY = "manager-presets";
 const MANAGER_PRESETS_UPDATED_EVENT = "manager-presets-updated";
-const MANAGER_PROJECTS_STORAGE_KEY = "manager-projects";
 
 type AdminStorageUser = {
   id: string;
@@ -171,65 +125,27 @@ const readTeamMembersByRole = (
   }
 };
 
-type ManagerProjectsPageProps = {
-  mode?: "manager" | "admin";
-  initialProjects?: Project[];
-};
-
-const fallbackPresets: Preset[] = [
-  {
-    id: "preset-1",
-    name: "Retail SKU V2",
-    description: "Bounding boxes for shelf-facing SKUs.",
-    labels: ["Cereal", "Snack", "Soda"],
-    createdAt: "2026-02-10",
-  },
-  {
-    id: "preset-2",
-    name: "Vehicle Boxes",
-    description: "Cars, buses, bikes, and trucks.",
-    labels: ["Car", "Bus", "Bike", "Truck"],
-    createdAt: "2026-02-12",
-  },
-];
-
 const readManagerPresets = (): Preset[] => {
   if (typeof window === "undefined") {
-    return fallbackPresets;
+    return [];
   }
 
   const raw = localStorage.getItem(MANAGER_PRESETS_STORAGE_KEY);
   if (!raw) {
-    return fallbackPresets;
+    return [];
   }
 
   try {
     const parsed = JSON.parse(raw) as Preset[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      return fallbackPresets;
-    }
-    return parsed;
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return fallbackPresets;
+    return [];
   }
 };
 
-const readManagerProjects = (initialProjects?: Project[]): Project[] => {
-  if (typeof window === "undefined") {
-    return initialProjects ?? [];
-  }
-
-  const raw = localStorage.getItem(MANAGER_PROJECTS_STORAGE_KEY);
-  if (!raw) {
-    return initialProjects ?? [];
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as Project[];
-    return Array.isArray(parsed) ? parsed : initialProjects ?? [];
-  } catch {
-    return initialProjects ?? [];
-  }
+type ManagerProjectsPageProps = {
+  mode?: "manager" | "admin";
+  initialProjects?: Project[];
 };
 
 export default function ManagerProjectsPage({
@@ -237,9 +153,11 @@ export default function ManagerProjectsPage({
   initialProjects,
 }: ManagerProjectsPageProps) {
   const isAdmin = mode === "admin";
-  const [projects, setProjects] = useState<Project[]>(() =>
-    isAdmin ? initialProjects ?? [] : readManagerProjects(initialProjects),
+  const shouldUseAdminApi = isAdmin && hasBackendConfig();
+  const [projects, setProjects] = useState<Project[]>(
+    () => initialProjects ?? [],
   );
+  const [isLoading, setIsLoading] = useState(false);
   const hasProjects = projects.length > 0;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -249,18 +167,12 @@ export default function ManagerProjectsPage({
   );
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
-  const [editProjectName, setEditProjectName] = useState("");
-  const [editProjectDescription, setEditProjectDescription] = useState("");
-  const [editProjectDataType, setEditProjectDataType] = useState<
-    Project["dataType"]
-  >("Image");
   const [presets, setPresets] = useState<Preset[]>(() => readManagerPresets());
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedUploadFiles, setSelectedUploadFiles] = useState<File[]>([]);
   const [uploadName, setUploadName] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
-  const [uploadedImageFiles, setUploadedImageFiles] = useState<UploadImageFile[]>([]);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailProject, setDetailProject] = useState<Project | null>(null);
@@ -268,32 +180,8 @@ export default function ManagerProjectsPage({
   const [isAssignReviewersOpen, setIsAssignReviewersOpen] = useState(false);
   const [isSelectPresetOpen, setIsSelectPresetOpen] = useState(false);
   const [assignSearch, setAssignSearch] = useState("");
-  const [selectedAnnotatorId, setSelectedAnnotatorId] = useState<string | null>(
-    null,
-  );
-  const [selectedReviewerId, setSelectedReviewerId] = useState<string | null>(
-    null,
-  );
-  const [selectedAnnotatorFiles, setSelectedAnnotatorFiles] = useState<string[]>(
-    [],
-  );
-  const [selectedReviewerFiles, setSelectedReviewerFiles] = useState<string[]>([]);
-  const [annotatorFileAssignments, setAnnotatorFileAssignments] = useState<
-    Record<string, string[]>
-  >({});
-  const [reviewerFileAssignments, setReviewerFileAssignments] = useState<
-    Record<string, string[]>
-  >({});
-  const assignedReviewerIds = useMemo(() => {
-    const ids = new Set<string>();
-    Object.values(reviewerFileAssignments).forEach((assigned) => {
-      assigned.forEach((id) => ids.add(id));
-    });
-    if (selectedReviewerId) {
-      ids.add(selectedReviewerId);
-    }
-    return Array.from(ids);
-  }, [reviewerFileAssignments, selectedReviewerId]);
+  const [selectedAnnotators, setSelectedAnnotators] = useState<string[]>([]);
+  const [selectedReviewers, setSelectedReviewers] = useState<string[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
   const [presetSearch, setPresetSearch] = useState("");
   const [annotators, setAnnotators] = useState<TeamMember[]>(() =>
@@ -305,36 +193,52 @@ export default function ManagerProjectsPage({
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
-  const assignedAnnotatorIds = useMemo(() => {
-    const ids = new Set<string>();
-    Object.values(annotatorFileAssignments).forEach((assigned) => {
-      assigned.forEach((id) => ids.add(id));
-    });
-    if (selectedAnnotatorId) {
-      ids.add(selectedAnnotatorId);
-    }
-    return Array.from(ids);
-  }, [annotatorFileAssignments, selectedAnnotatorId]);
 
-  const handleCreate = (event: FormEvent) => {
+  const handleCreate = async (event: FormEvent) => {
     event.preventDefault();
     const now = new Date();
     const createdAt = now.toISOString().slice(0, 10);
-    setProjects((prev) => [
-      {
-        id: crypto.randomUUID(),
-        name: projectName.trim() || "Untitled Project",
-        description: projectDescription.trim(),
-        status: "Drafting",
-        dataType: projectDataType,
-        createdAt,
-      },
-      ...prev,
-    ]);
+
+    try {
+      if (shouldUseAdminApi) {
+        const created = await createAdminProject({
+          name: projectName.trim() || "Untitled Project",
+          description: projectDescription.trim(),
+          dataType: projectDataType,
+        });
+        setProjects((prev) => [created as Project, ...prev]);
+      } else {
+        setProjects((prev) => [
+          {
+            id: crypto.randomUUID(),
+            name: projectName.trim() || "Untitled Project",
+            description: projectDescription.trim(),
+            status: "Drafting",
+            dataType: projectDataType,
+            createdAt,
+          },
+          ...prev,
+        ]);
+      }
+      toast.success("Project created.");
+    } catch {
+      toast.error("Create project failed.");
+      return;
+    }
+
     setIsCreateOpen(false);
     setProjectName("");
     setProjectDescription("");
     setProjectDataType("Image");
+  };
+
+  const handleOpenEdit = (project: Project) => {
+    setActiveProject(project);
+    setIsEditOpen(true);
+    setIsUploadOpen(false);
+    setIsAssignAnnotatorsOpen(false);
+    setIsAssignReviewersOpen(false);
+    setIsSelectPresetOpen(false);
   };
 
   const handleOpenDetails = (project: Project) => {
@@ -376,14 +280,8 @@ export default function ManagerProjectsPage({
         })),
       );
 
-      const filePayload = selectedUploadFiles.map((file, index) => ({
-        name: updatedNames[index],
-        file,
-      }));
-
       setUploadedFiles((prev) => [...prev, ...updatedNames]);
       setUploadedImages((prev) => [...prev, ...imagePayload]);
-      setUploadedImageFiles((prev) => [...prev, ...filePayload]);
     }
     setIsUploadOpen(false);
     setSelectedUploadFiles([]);
@@ -408,70 +306,30 @@ export default function ManagerProjectsPage({
     }, 200);
   };
 
-  const handleDeleteProject = (projectId: string) => {
-    setProjects((prev) => prev.filter((project) => project.id !== projectId));
+  const handleDeleteProject = async (projectId: string) => {
+    try {
+      if (shouldUseAdminApi) {
+        await deleteAdminProject(projectId);
+      }
+      setProjects((prev) => prev.filter((project) => project.id !== projectId));
+      toast.success("Project deleted.");
+    } catch {
+      toast.error("Delete project failed.");
+    }
   };
 
   const updateProjectStatus = (status: Project["status"]) => {
     if (!activeProject) {
       return;
     }
-
-    const nextName = editProjectName.trim() || activeProject.name;
-    const nextDescription = editProjectDescription.trim();
-
     setProjects((prev) =>
       prev.map((project) =>
-        project.id === activeProject.id
-          ? {
-              ...project,
-              name: nextName,
-              description: nextDescription,
-              dataType: editProjectDataType,
-              status,
-              uploadedFiles,
-              selectedPreset,
-              assignedAnnotatorIds,
-              assignedReviewerIds,
-              annotatorFileAssignments,
-              reviewerFileAssignments,
-            }
-          : project,
+        project.id === activeProject.id ? { ...project, status } : project,
       ),
     );
-    setActiveProject((prev) =>
-      prev
-        ? {
-            ...prev,
-            name: nextName,
-            description: nextDescription,
-            dataType: editProjectDataType,
-            status,
-            uploadedFiles,
-            selectedPreset,
-            assignedAnnotatorIds,
-            assignedReviewerIds,
-            annotatorFileAssignments,
-            reviewerFileAssignments,
-          }
-        : prev,
-    );
+    setActiveProject((prev) => (prev ? { ...prev, status } : prev));
     setDetailProject((prev) =>
-      prev && prev.id === activeProject.id
-        ? {
-            ...prev,
-            name: nextName,
-            description: nextDescription,
-            dataType: editProjectDataType,
-            status,
-            uploadedFiles,
-            selectedPreset,
-            assignedAnnotatorIds,
-            assignedReviewerIds,
-            annotatorFileAssignments,
-            reviewerFileAssignments,
-          }
-        : prev,
+      prev && prev.id === activeProject.id ? { ...prev, status } : prev,
     );
   };
 
@@ -480,28 +338,16 @@ export default function ManagerProjectsPage({
     closeWithAnimation("editProject", setIsEditOpen);
   };
 
-  const pushTaskToAnnotatorQueue = async () => {
+  const pushTaskToAnnotatorQueue = () => {
     if (!activeProject) {
-      return false;
+      return;
     }
-    const assignedNames = resolveNames(
-      annotators,
-      assignedAnnotatorIds,
-    );
-    const reviewerNames = resolveNames(
-      reviewers,
-      assignedReviewerIds,
-    );
+    const assignedNames = resolveNames(annotators, selectedAnnotators);
     const today = new Date();
     const dueDate = new Date(today);
     dueDate.setDate(today.getDate() + 7);
 
-    let uploadedImageRefs: StoredImageRef[] = [];
-    if (uploadedImageFiles.length > 0) {
-      uploadedImageRefs = await saveFilesToImageStore(uploadedImageFiles);
-    }
-
-    const basePayload = {
+    const payload = {
       id: `task-${activeProject.id}`,
       projectName: activeProject.name,
       dataset:
@@ -524,85 +370,24 @@ export default function ManagerProjectsPage({
         "Quality self-check completed",
       ],
       labels: selectedPreset?.labels ?? ["Label A", "Label B"],
+      uploadedImages,
       assignedAnnotators: assignedNames,
-      assignedReviewers: reviewerNames,
-      assignedAnnotatorIds,
-      assignedReviewerIds,
-      annotatorAssignmentsByFile: annotatorFileAssignments,
-      reviewerAssignmentsByFile: reviewerFileAssignments,
-      uploadedImageRefs,
     };
 
     const raw = localStorage.getItem(ANNOTATOR_TASKS_STORAGE_KEY);
-    let existing: Array<Record<string, unknown>> = [];
-
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
-        existing = Array.isArray(parsed) ? parsed : [];
-      } catch {
-        existing = [];
-      }
-    }
-
-    const buildNext = (images: UploadedImage[]) => {
-      const payload = {
-        ...basePayload,
-        uploadedImages: images,
-      };
-
-      return [
-        payload,
-        ...existing.filter((item) => item.id !== payload.id),
-      ];
-    };
-
-    try {
-      const next = buildNext(toLightweightImages(uploadedImages));
-      localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(next));
-      window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
-      return true;
-    } catch {
-      try {
-        const compactExisting: Array<Record<string, unknown>> = existing.map((item) => ({
-          ...item,
-          uploadedImages: compactUnknownImages(item.uploadedImages),
-          submittedImages: compactUnknownImages(item.submittedImages),
-        }));
-
-        const payload = {
-          ...basePayload,
-          uploadedImages: toLightweightImages(uploadedImages),
-        };
-
-        const next = [
-          payload,
-          ...compactExisting.filter((item) => item["id"] !== payload.id),
-        ];
-        localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(next));
-        window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
-        toast.warning("Images were optimized for storage limit. Assignment still succeeded.");
-        return true;
-      } catch {
-        return false;
-      }
-    }
+    const existing = raw ? (JSON.parse(raw) as Array<Record<string, unknown>>) : [];
+    const next = [
+      payload,
+      ...existing.filter((item) => item.id !== payload.id),
+    ];
+    localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
   };
 
-  const handleConfirmAssigned = async () => {
-    try {
-      const queued = await pushTaskToAnnotatorQueue();
-      if (!queued) {
-        toast.error("Assign failed: storage is full or project data is invalid.");
-        return;
-      }
-
-      updateProjectStatus("Active");
-      toast.success("Project assigned successfully.");
-      closeWithAnimation("editProject", setIsEditOpen);
-    } catch {
-      toast.error("Assign failed. Please try again.");
-    }
+  const handleConfirmAssigned = () => {
+    pushTaskToAnnotatorQueue();
+    updateProjectStatus("Active");
+    closeWithAnimation("editProject", setIsEditOpen);
   };
 
   const handleOverlayClick = (
@@ -620,74 +405,12 @@ export default function ManagerProjectsPage({
     id: string,
     setter: Dispatch<SetStateAction<string[]>>,
   ) => {
-    setter((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
-    );
+    setter((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   };
 
   const resolveNames = (list: TeamMember[], ids: string[]) => {
     return ids.map((id) => list.find((item) => item.id === id)?.name || id);
   };
-
-  const applyAssignments = (
-    selectedFiles: string[],
-    selectedMembers: string[],
-    setAssignments: Dispatch<SetStateAction<Record<string, string[]>>>,
-  ) => {
-    if (selectedFiles.length === 0 || selectedMembers.length === 0) {
-      return;
-    }
-    setAssignments((prev) => {
-      const next = { ...prev };
-      selectedFiles.forEach((file) => {
-        const existing = next[file] ?? [];
-        next[file] = Array.from(new Set([...existing, ...selectedMembers]));
-      });
-      return next;
-    });
-  };
-
-  useEffect(() => {
-    if (isAdmin || typeof window === "undefined") {
-      return;
-    }
-
-    localStorage.setItem(MANAGER_PROJECTS_STORAGE_KEY, JSON.stringify(projects));
-  }, [isAdmin, projects]);
-
-  useEffect(() => {
-    const refreshPresets = () => {
-      setPresets(readManagerPresets());
-    };
-
-    window.addEventListener("storage", refreshPresets);
-    window.addEventListener(MANAGER_PRESETS_UPDATED_EVENT, refreshPresets);
-
-    return () => {
-      window.removeEventListener("storage", refreshPresets);
-      window.removeEventListener(MANAGER_PRESETS_UPDATED_EVENT, refreshPresets);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!selectedPreset) {
-      return;
-    }
-
-    const latest = presets.find((preset) => preset.id === selectedPreset.id);
-    if (!latest) {
-      setSelectedPreset(null);
-      return;
-    }
-
-    if (
-      latest.name !== selectedPreset.name ||
-      latest.description !== selectedPreset.description ||
-      latest.labels.join("|") !== selectedPreset.labels.join("|")
-    ) {
-      setSelectedPreset(latest);
-    }
-  }, [presets, selectedPreset]);
 
   useEffect(() => {
     const refreshMembers = () => {
@@ -737,23 +460,59 @@ export default function ManagerProjectsPage({
     }
   }, [presets, selectedPreset]);
 
+  useEffect(() => {
+    if (!shouldUseAdminApi) {
+      return;
+    }
+
+    let mounted = true;
+    setIsLoading(true);
+
+    const loadProjects = async () => {
+      try {
+        const remoteProjects = await fetchAdminProjects();
+        if (mounted) {
+          setProjects(remoteProjects as Project[]);
+        }
+      } catch {
+        if (mounted) {
+          toast.error("Failed to load projects from API.");
+        }
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadProjects();
+
+    return () => {
+      mounted = false;
+    };
+  }, [shouldUseAdminApi]);
+
   return (
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-800">Projects</h2>
-        {!isAdmin && (
-          <button
-            type="button"
-            onClick={() => setIsCreateOpen(true)}
-            className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-          >
-            <span className="text-lg leading-none">+</span>
-            New Project
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setIsCreateOpen(true)}
+          className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+        >
+          <span className="text-lg leading-none">+</span>
+          New Project
+        </button>
       </div>
 
       <div className="mb-4 h-px w-full bg-gray-200" />
+
+      {isLoading && (
+        <div className="mb-4 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+          Loading projects from API...
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <div className="flex flex-col gap-1">
@@ -834,16 +593,14 @@ export default function ManagerProjectsPage({
               ? "No projects are available right now."
               : "Get started by creating your first data labeling project"}
           </p>
-          {!isAdmin && (
-            <button
-              type="button"
-              onClick={() => setIsCreateOpen(true)}
-              className="mt-5 flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-            >
-              <span className="text-base leading-none">+</span>
-              Create Project
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="mt-5 flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+          >
+            <span className="text-base leading-none">+</span>
+            Create Project
+          </button>
         </div>
       ) : (
         <div className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -884,29 +641,27 @@ export default function ManagerProjectsPage({
                 >
                   Details
                 </button>
-                {isAdmin ? (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteProject(project.id)}
-                    className="text-red-500 hover:text-red-600"
-                  >
-                    Delete
-                  </button>
-                ) : (
-                  <Link
-                    to={`/manager/projects/${project.id}`}
-                    className="text-blue-600 hover:text-blue-700"
-                  >
-                    Edit
-                  </Link>
-                )}
+                <button
+                  type="button"
+                  onClick={() => handleOpenEdit(project)}
+                  className="text-blue-600 hover:text-blue-700"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteProject(project.id)}
+                  className="text-red-500 hover:text-red-600"
+                >
+                  Delete
+                </button>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {!isAdmin && isCreateOpen && createPortal(
+      {isCreateOpen && createPortal(
         <div
           className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30 px-4"
           onClick={(event) =>
@@ -1046,15 +801,12 @@ export default function ManagerProjectsPage({
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-md border border-gray-200 p-3">
                   <p className="text-xs font-semibold text-gray-700">
-                    Assigned Annotators
+                    Assigned Annotator
                   </p>
                   <p className="mt-2 text-sm text-gray-800">
-                    {(detailProject.assignedAnnotatorIds ?? []).length === 0
+                    {selectedAnnotators.length === 0
                       ? "Unassigned"
-                      : resolveNames(
-                          annotators,
-                          detailProject.assignedAnnotatorIds ?? [],
-                        ).join(", ")}
+                      : resolveNames(annotators, selectedAnnotators).join(", ")}
                   </p>
                 </div>
                 <div className="rounded-md border border-gray-200 p-3">
@@ -1062,12 +814,9 @@ export default function ManagerProjectsPage({
                     Assigned Reviewer
                   </p>
                   <p className="mt-2 text-sm text-gray-800">
-                    {(detailProject.assignedReviewerIds ?? []).length === 0
+                    {selectedReviewers.length === 0
                       ? "Unassigned"
-                      : resolveNames(
-                          reviewers,
-                          detailProject.assignedReviewerIds ?? [],
-                        ).join(", ")}
+                      : resolveNames(reviewers, selectedReviewers).join(", ")}
                   </p>
                 </div>
                 <div className="rounded-md border border-gray-200 p-3">
@@ -1075,17 +824,16 @@ export default function ManagerProjectsPage({
                     Selected Preset
                   </p>
                   <p className="mt-2 text-sm text-gray-800">
-                    {detailProject.selectedPreset?.name ||
-                      "No preset selected"}
+                    {selectedPreset?.name || "No preset selected"}
                   </p>
                 </div>
                 <div className="rounded-md border border-gray-200 p-3">
                   <p className="text-xs font-semibold text-gray-700">Uploaded files</p>
-                  {(detailProject.uploadedFiles ?? []).length === 0 ? (
+                  {uploadedFiles.length === 0 ? (
                     <p className="mt-2 text-xs text-gray-400">No images uploaded</p>
                   ) : (
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {(detailProject.uploadedFiles ?? []).map((file) => (
+                      {uploadedFiles.map((file) => (
                         <span
                           key={file}
                           className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
@@ -1149,52 +897,16 @@ export default function ManagerProjectsPage({
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-base font-semibold text-gray-900">
-                      {editProjectName || activeProject.name}
+                      {activeProject.name}
                     </h2>
                     <p className="mt-1 text-xs text-gray-500">
-                      {editProjectDescription ||
+                      {activeProject.description ||
                         "Example Image Classification Example"}
                     </p>
                   </div>
                   <span className="rounded-md bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
                     {activeProject.status}
                   </span>
-                </div>
-              </div>
-
-              <div className="mt-2 grid grid-cols-1 gap-2 rounded-md border border-gray-200 p-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-1 sm:col-span-2">
-                  <label className="text-xs font-semibold text-gray-700">Project name</label>
-                  <input
-                    value={editProjectName}
-                    onChange={(event) => setEditProjectName(event.target.value)}
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                    placeholder="Project name"
-                  />
-                </div>
-                <div className="flex flex-col gap-1 sm:col-span-2">
-                  <label className="text-xs font-semibold text-gray-700">Project description</label>
-                  <textarea
-                    value={editProjectDescription}
-                    onChange={(event) => setEditProjectDescription(event.target.value)}
-                    className="min-h-[80px] rounded-md border border-gray-300 px-3 py-2 text-sm"
-                    placeholder="Project description"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-gray-700">Data type</label>
-                  <select
-                    value={editProjectDataType}
-                    onChange={(event) =>
-                      setEditProjectDataType(event.target.value as Project["dataType"])
-                    }
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  >
-                    <option value="Image">Image</option>
-                    <option value="Video">Video</option>
-                    <option value="Text">Text</option>
-                    <option value="Audio">Audio</option>
-                  </select>
                 </div>
               </div>
 
@@ -1297,13 +1009,11 @@ export default function ManagerProjectsPage({
                           }
                           if (section.id === "annotators") {
                             setAssignSearch("");
-                            setSelectedAnnotatorFiles([]);
                             setIsAssignAnnotatorsOpen(true);
                             return;
                           }
                           if (section.id === "reviewers") {
                             setAssignSearch("");
-                            setSelectedReviewerFiles([]);
                             setIsAssignReviewersOpen(true);
                             return;
                           }
@@ -1335,13 +1045,13 @@ export default function ManagerProjectsPage({
                         </div>
                       )
                     ) : section.id === "annotators" ? (
-                      assignedAnnotatorIds.length === 0 ? (
+                      selectedAnnotators.length === 0 ? (
                         <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
                           {section.empty}
                         </div>
                       ) : (
                         <div className="mt-2 flex flex-wrap gap-2">
-                          {resolveNames(annotators, assignedAnnotatorIds).map(
+                          {resolveNames(annotators, selectedAnnotators).map(
                             (name) => (
                               <span
                                 key={name}
@@ -1354,22 +1064,20 @@ export default function ManagerProjectsPage({
                         </div>
                       )
                     ) : section.id === "reviewers" ? (
-                      !selectedReviewerId ? (
+                      selectedReviewers.length === 0 ? (
                         <div className="flex min-h-[44px] items-center justify-center text-sm text-gray-400">
                           {section.empty}
                         </div>
                       ) : (
                         <div className="mt-2 flex flex-wrap gap-2">
-                          {resolveNames(reviewers, [selectedReviewerId]).map(
-                            (name) => (
-                              <span
-                                key={name}
-                                className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
-                              >
-                                {name}
-                              </span>
-                            ),
-                          )}
+                          {resolveNames(reviewers, selectedReviewers).map((name) => (
+                            <span
+                              key={name}
+                              className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
+                            >
+                              {name}
+                            </span>
+                          ))}
                         </div>
                       )
                     ) : section.id === "presets" ? (
@@ -1389,40 +1097,6 @@ export default function ManagerProjectsPage({
                         {section.empty}
                       </div>
                     )}
-                    {section.id === "annotators" &&
-                      Object.keys(annotatorFileAssignments).length > 0 && (
-                        <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-2 text-xs text-gray-700">
-                          <p className="font-semibold text-gray-800">
-                            Assigned files
-                          </p>
-                          <div className="mt-2 flex flex-col gap-1">
-                            {Object.entries(annotatorFileAssignments).map(
-                              ([file, ids]) => (
-                                <span key={file}>
-                                  {file}: {resolveNames(annotators, ids).join(", ")}
-                                </span>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    {section.id === "reviewers" &&
-                      Object.keys(reviewerFileAssignments).length > 0 && (
-                        <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-2 text-xs text-gray-700">
-                          <p className="font-semibold text-gray-800">
-                            Assigned files
-                          </p>
-                          <div className="mt-2 flex flex-col gap-1">
-                            {Object.entries(reviewerFileAssignments).map(
-                              ([file, ids]) => (
-                                <span key={file}>
-                                  {file}: {resolveNames(reviewers, ids).join(", ")}
-                                </span>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      )}
                   </div>
                 ))}
 
@@ -1617,7 +1291,7 @@ export default function ManagerProjectsPage({
                   </p>
                   <button
                     type="button"
-                    onClick={() => setSelectedAnnotatorId(null)}
+                    onClick={() => setSelectedAnnotators([])}
                     className="text-xs font-semibold text-gray-500 hover:text-gray-700"
                   >
                     Clear
@@ -1646,10 +1320,11 @@ export default function ManagerProjectsPage({
                             {member.workload}
                           </span>
                           <input
-                            type="radio"
-                            name="selected-annotator"
-                            checked={selectedAnnotatorId === member.id}
-                            onChange={() => setSelectedAnnotatorId(member.id)}
+                            type="checkbox"
+                            checked={selectedAnnotators.includes(member.id)}
+                            onChange={() =>
+                              toggleSelection(member.id, setSelectedAnnotators)
+                            }
                           />
                         </div>
                       </label>
@@ -1657,59 +1332,12 @@ export default function ManagerProjectsPage({
                 </div>
               </div>
 
-              <div className="mt-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-800">
-                    Assign to files
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedAnnotatorFiles([])}
-                    className="text-xs font-semibold text-gray-500 hover:text-gray-700"
-                  >
-                    Clear files
-                  </button>
-                </div>
-                <div className="mt-2 space-y-2 rounded-md border border-gray-300 p-3">
-                  {uploadedFiles.length === 0 ? (
-                    <p className="text-xs text-gray-400">
-                      No files uploaded yet.
-                    </p>
-                  ) : (
-                    uploadedFiles.map((file) => (
-                      <label
-                        key={file}
-                        className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
-                      >
-                        <span className="truncate">{file}</span>
-                        <input
-                          type="checkbox"
-                          checked={selectedAnnotatorFiles.includes(file)}
-                          onChange={() =>
-                            toggleSelection(file, setSelectedAnnotatorFiles)
-                          }
-                        />
-                      </label>
-                    ))
-                  )}
-                </div>
-              </div>
-
               <div className="mt-4 flex justify-end">
                 <button
                   type="button"
-                  onClick={() => {
-                    applyAssignments(
-                      selectedAnnotatorFiles,
-                      selectedAnnotatorId ? [selectedAnnotatorId] : [],
-                      setAnnotatorFileAssignments,
-                    );
-                    setSelectedAnnotatorFiles([]);
-                    closeWithAnimation(
-                      "assignAnnotators",
-                      setIsAssignAnnotatorsOpen,
-                    );
-                  }}
+                  onClick={() =>
+                    closeWithAnimation("assignAnnotators", setIsAssignAnnotatorsOpen)
+                  }
                   className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
                 >
                   Confirm assign
@@ -1760,7 +1388,7 @@ export default function ManagerProjectsPage({
                   </p>
                   <button
                     type="button"
-                    onClick={() => setSelectedReviewerId(null)}
+                    onClick={() => setSelectedReviewers([])}
                     className="text-xs font-semibold text-gray-500 hover:text-gray-700"
                   >
                     Clear
@@ -1789,10 +1417,11 @@ export default function ManagerProjectsPage({
                             {member.workload}
                           </span>
                           <input
-                            type="radio"
-                            name="selected-reviewer"
-                            checked={selectedReviewerId === member.id}
-                            onChange={() => setSelectedReviewerId(member.id)}
+                            type="checkbox"
+                            checked={selectedReviewers.includes(member.id)}
+                            onChange={() =>
+                              toggleSelection(member.id, setSelectedReviewers)
+                            }
                           />
                         </div>
                       </label>
@@ -1800,59 +1429,12 @@ export default function ManagerProjectsPage({
                 </div>
               </div>
 
-              <div className="mt-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-800">
-                    Assign to files
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedReviewerFiles([])}
-                    className="text-xs font-semibold text-gray-500 hover:text-gray-700"
-                  >
-                    Clear files
-                  </button>
-                </div>
-                <div className="mt-2 space-y-2 rounded-md border border-gray-300 p-3">
-                  {uploadedFiles.length === 0 ? (
-                    <p className="text-xs text-gray-400">
-                      No files uploaded yet.
-                    </p>
-                  ) : (
-                    uploadedFiles.map((file) => (
-                      <label
-                        key={file}
-                        className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
-                      >
-                        <span className="truncate">{file}</span>
-                        <input
-                          type="checkbox"
-                          checked={selectedReviewerFiles.includes(file)}
-                          onChange={() =>
-                            toggleSelection(file, setSelectedReviewerFiles)
-                          }
-                        />
-                      </label>
-                    ))
-                  )}
-                </div>
-              </div>
-
               <div className="mt-4 flex justify-end">
                 <button
                   type="button"
-                  onClick={() => {
-                    applyAssignments(
-                      selectedReviewerFiles,
-                      selectedReviewerId ? [selectedReviewerId] : [],
-                      setReviewerFileAssignments,
-                    );
-                    setSelectedReviewerFiles([]);
-                    closeWithAnimation(
-                      "assignReviewers",
-                      setIsAssignReviewersOpen,
-                    );
-                  }}
+                  onClick={() =>
+                    closeWithAnimation("assignReviewers", setIsAssignReviewersOpen)
+                  }
                   className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
                 >
                   Confirm assign
@@ -1902,21 +1484,23 @@ export default function ManagerProjectsPage({
                   </span>
                 </div>
                 <div className="mt-2 space-y-2 rounded-md border border-gray-300 p-3">
-                  {presets.length === 0 ? (
+                  {presets.filter((preset) => {
+                    const keyword = presetSearch.toLowerCase();
+                    return (
+                      preset.name.toLowerCase().includes(keyword) ||
+                      (preset.description ?? "").toLowerCase().includes(keyword)
+                    );
+                  }).length === 0 ? (
                     <span className="text-xs text-gray-400">No presets available</span>
-                  ) : presets.filter((preset) =>
-                      `${preset.name} ${preset.description ?? ""}`
-                        .toLowerCase()
-                        .includes(presetSearch.toLowerCase()),
-                    ).length === 0 ? (
-                    <span className="text-xs text-gray-400">No matching preset</span>
                   ) : (
                     presets
-                      .filter((preset) =>
-                        `${preset.name} ${preset.description ?? ""}`
-                          .toLowerCase()
-                          .includes(presetSearch.toLowerCase()),
-                      )
+                      .filter((preset) => {
+                        const keyword = presetSearch.toLowerCase();
+                        return (
+                          preset.name.toLowerCase().includes(keyword) ||
+                          (preset.description ?? "").toLowerCase().includes(keyword)
+                        );
+                      })
                       .map((preset) => (
                       <button
                         key={preset.id}

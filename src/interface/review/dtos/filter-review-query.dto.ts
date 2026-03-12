@@ -1,10 +1,5 @@
-<<<<<<< Updated upstream
-import { BasePaginationQueryDto } from '../../common/base-pagination-query.dto';
-import { Decision } from '../enums/decisions.enums';
-=======
 import type { BasePaginationQueryDto } from "../../common/base-pagination-query.dto";
-import type { Decision } from "../../enums/domain.enums";
->>>>>>> Stashed changes
+import type { Decision } from "../enums/decisions.enums";
 
 export interface FilterReviewQueryDto extends BasePaginationQueryDto {
   fileLabelId?: string;
@@ -13,5 +8,5 @@ export interface FilterReviewQueryDto extends BasePaginationQueryDto {
   searchBy?: string;
   decision?: Decision;
   checklistAnswerId?: string;
-  orderBy?: string;
+  orderBy?: "createdAt" | "updatedAt" | "reviewedAt";
 }

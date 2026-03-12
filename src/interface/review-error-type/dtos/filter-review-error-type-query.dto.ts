@@ -1,4 +1,4 @@
-import { BasePaginationQueryDto } from '../../common/base-pagination-query.dto';
+import type { BasePaginationQueryDto } from '../../common/base-pagination-query.dto';
 import { Severity } from '../enums/severity.enums';
 
 export interface FilterReviewErrorTypeQueryDto extends BasePaginationQueryDto {
@@ -6,5 +6,4 @@ export interface FilterReviewErrorTypeQueryDto extends BasePaginationQueryDto {
   searchBy?: string;
   severity?: Severity;
   orderBy?: string;
-}
 }
