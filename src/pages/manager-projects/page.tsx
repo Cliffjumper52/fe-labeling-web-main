@@ -13,12 +13,25 @@ import { Link } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { saveFilesToImageStore, type StoredImageRef } from "../../utils/image-store";
+import type { ApiResponse } from "../../interface/common/api-response.interface";
+import type { DataType, ProjectStatus } from "../../interface/enums/domain.enums";
+import type { Project as ApiProject } from "../../interface/project/project.interface";
+import type { LabelPreset as ApiLabelPreset } from "../../interface/label-preset/label-preset.interface";
+import {
+  createProject,
+  deleteProject,
+  getProjectById,
+  getProjectsPaginated,
+  updateProject,
+} from "../../services/project-service.service";
+import { getLabelPresetsPaginated } from "../../services/label-preset-service.service";
+import Pagination from "../../components/common/pagination";
 
 type Project = {
   id: string;
   name: string;
   description?: string;
-  status: "Drafting" | "Active" | "Archived";
+  status: "Drafting" | "Active" | "Archived" | "Completed";
   dataType: "Image" | "Video" | "Text" | "Audio";
   createdAt: string;
   uploadedFiles?: string[];
@@ -33,7 +46,8 @@ type Preset = {
   id: string;
   name: string;
   description?: string;
-  labels: string[];
+  labelIds: string[];
+  labelNames: string[];
   createdAt: string;
 };
 
@@ -95,9 +109,13 @@ const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
 const ANNOTATOR_TASKS_UPDATED_EVENT = "annotator-tasks-updated";
 const ADMIN_USERS_STORAGE_KEY = "admin-users";
 const ADMIN_USERS_UPDATED_EVENT = "admin-users-updated";
-const MANAGER_PRESETS_STORAGE_KEY = "manager-presets";
-const MANAGER_PRESETS_UPDATED_EVENT = "manager-presets-updated";
-const MANAGER_PROJECTS_STORAGE_KEY = "manager-projects";
+const PAGE_LIMIT = 10;
+
+type PaginationResult<T> = {
+  data: T[];
+  totalPages?: number;
+  pageCount?: number;
+};
 
 type AdminStorageUser = {
   id: string;
@@ -181,56 +199,19 @@ const fallbackPresets: Preset[] = [
     id: "preset-1",
     name: "Retail SKU V2",
     description: "Bounding boxes for shelf-facing SKUs.",
-    labels: ["Cereal", "Snack", "Soda"],
+    labelIds: ["Cereal", "Snack", "Soda"],
+    labelNames: ["Cereal", "Snack", "Soda"],
     createdAt: "2026-02-10",
   },
   {
     id: "preset-2",
     name: "Vehicle Boxes",
     description: "Cars, buses, bikes, and trucks.",
-    labels: ["Car", "Bus", "Bike", "Truck"],
+    labelIds: ["Car", "Bus", "Bike", "Truck"],
+    labelNames: ["Car", "Bus", "Bike", "Truck"],
     createdAt: "2026-02-12",
   },
 ];
-
-const readManagerPresets = (): Preset[] => {
-  if (typeof window === "undefined") {
-    return fallbackPresets;
-  }
-
-  const raw = localStorage.getItem(MANAGER_PRESETS_STORAGE_KEY);
-  if (!raw) {
-    return fallbackPresets;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as Preset[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      return fallbackPresets;
-    }
-    return parsed;
-  } catch {
-    return fallbackPresets;
-  }
-};
-
-const readManagerProjects = (initialProjects?: Project[]): Project[] => {
-  if (typeof window === "undefined") {
-    return initialProjects ?? [];
-  }
-
-  const raw = localStorage.getItem(MANAGER_PROJECTS_STORAGE_KEY);
-  if (!raw) {
-    return initialProjects ?? [];
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as Project[];
-    return Array.isArray(parsed) ? parsed : initialProjects ?? [];
-  } catch {
-    return initialProjects ?? [];
-  }
-};
 
 export default function ManagerProjectsPage({
   mode = "manager",
@@ -238,9 +219,22 @@ export default function ManagerProjectsPage({
 }: ManagerProjectsPageProps) {
   const isAdmin = mode === "admin";
   const [projects, setProjects] = useState<Project[]>(() =>
-    isAdmin ? initialProjects ?? [] : readManagerProjects(initialProjects),
+    initialProjects ?? [],
   );
-  const hasProjects = projects.length > 0;
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [projectSearch, setProjectSearch] = useState("");
+  const [projectStatusFilter, setProjectStatusFilter] = useState<
+    "All" | "Active" | "Archived" | "Drafting" | "Completed"
+  >("All");
+  const [projectOrderBy, setProjectOrderBy] = useState<
+    "Name" | "Date created" | "Updated"
+  >("Date created");
+  const [projectOrder, setProjectOrder] = useState<
+    "Ascending" | "Descending"
+  >("Descending");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -254,7 +248,8 @@ export default function ManagerProjectsPage({
   const [editProjectDataType, setEditProjectDataType] = useState<
     Project["dataType"]
   >("Image");
-  const [presets, setPresets] = useState<Preset[]>(() => readManagerPresets());
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [presetsLoading, setPresetsLoading] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedUploadFiles, setSelectedUploadFiles] = useState<File[]>([]);
   const [uploadName, setUploadName] = useState("");
@@ -267,6 +262,7 @@ export default function ManagerProjectsPage({
   const [isAssignAnnotatorsOpen, setIsAssignAnnotatorsOpen] = useState(false);
   const [isAssignReviewersOpen, setIsAssignReviewersOpen] = useState(false);
   const [isSelectPresetOpen, setIsSelectPresetOpen] = useState(false);
+  const [createPresetSearch, setCreatePresetSearch] = useState("");
   const [assignSearch, setAssignSearch] = useState("");
   const [selectedAnnotatorId, setSelectedAnnotatorId] = useState<string | null>(
     null,
@@ -296,6 +292,7 @@ export default function ManagerProjectsPage({
   }, [reviewerFileAssignments, selectedReviewerId]);
   const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
   const [presetSearch, setPresetSearch] = useState("");
+  const [selectedPresetIds, setSelectedPresetIds] = useState<string[]>([]);
   const [annotators, setAnnotators] = useState<TeamMember[]>(() =>
     readTeamMembersByRole("Annotator", fallbackAnnotators),
   );
@@ -316,25 +313,218 @@ export default function ManagerProjectsPage({
     return Array.from(ids);
   }, [annotatorFileAssignments, selectedAnnotatorId]);
 
-  const handleCreate = (event: FormEvent) => {
+  const selectedPresets = useMemo(() => {
+    if (selectedPresetIds.length === 0) {
+      return [];
+    }
+    return presets.filter((preset) => selectedPresetIds.includes(preset.id));
+  }, [presets, selectedPresetIds]);
+
+  const visibleProjects = useMemo(() => {
+    if (projectStatusFilter === "All") {
+      return projects;
+    }
+    return projects.filter((project) => project.status === projectStatusFilter);
+  }, [projects, projectStatusFilter]);
+
+  const hasProjects = visibleProjects.length > 0;
+
+  const unwrapApiResponse = <T,>(payload: unknown): T | null => {
+    if (!payload || typeof payload !== "object") {
+      return payload as T;
+    }
+
+    if ("data" in payload) {
+      return (payload as ApiResponse<T>).data;
+    }
+
+    return payload as T;
+  };
+
+  const extractArray = <T,>(payload: unknown): T[] => {
+    const data = unwrapApiResponse<T[] | PaginationResult<T>>(payload);
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && typeof data === "object") {
+      const inner = data as PaginationResult<T>;
+      if (Array.isArray(inner.data)) {
+        return inner.data;
+      }
+    }
+    return [];
+  };
+
+  const extractTotalPages = (payload: unknown): number => {
+    const data = unwrapApiResponse<PaginationResult<unknown>>(payload);
+    if (data && typeof data === "object") {
+      return data.totalPages ?? data.pageCount ?? 1;
+    }
+    return 1;
+  };
+
+  const extractErrorMessage = (error: unknown, fallback: string) => {
+    const message = (error as { response?: { data?: { message?: unknown } } })
+      ?.response?.data?.message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+    return error instanceof Error ? error.message : fallback;
+  };
+
+  const isNotFoundError = (error: unknown) => {
+    return (error as { response?: { status?: number } })?.response?.status === 404;
+  };
+
+  const dataTypeEnumToLabel = (value: DataType): Project["dataType"] => {
+    switch (value) {
+      case "image":
+        return "Image";
+      case "video":
+        return "Video";
+      case "audio":
+        return "Audio";
+      case "text":
+      default:
+        return "Text";
+    }
+  };
+
+  const dataTypeLabelToEnum = (value: Project["dataType"]): DataType => {
+    switch (value) {
+      case "Image":
+        return "image";
+      case "Video":
+        return "video";
+      case "Audio":
+        return "audio";
+      case "Text":
+      default:
+        return "text";
+    }
+  };
+
+  const statusEnumToLabel = (value: ProjectStatus): Project["status"] => {
+    switch (value) {
+      case "active":
+        return "Active";
+      case "archived":
+        return "Archived";
+      case "completed":
+        return "Completed";
+      case "draft":
+      default:
+        return "Drafting";
+    }
+  };
+
+  const normalizeProject = (project: ApiProject): Project => {
+    return {
+      id: project.id,
+      name: project.name,
+      description: project.description ?? undefined,
+      status: statusEnumToLabel(project.projectStatus),
+      dataType: dataTypeEnumToLabel(project.dataType),
+      createdAt: project.createdAt,
+    };
+  };
+
+  const mapLabelPreset = (preset: ApiLabelPreset): Preset => {
+    const labelRefs = Array.isArray(preset.labels)
+      ? (preset.labels as Array<{ id: string; name?: string }>).filter(
+          (label) => Boolean(label?.id),
+        )
+      : [];
+
+    return {
+      id: preset.id,
+      name: preset.name,
+      description: preset.description ?? undefined,
+      labelIds: labelRefs.map((label) => label.id),
+      labelNames: labelRefs.map((label) => label.name ?? label.id),
+      createdAt: preset.createdAt,
+    };
+  };
+
+  const loadPresets = async (searchTerm = "") => {
+    setPresetsLoading(true);
+
+    try {
+      const response = await getLabelPresetsPaginated({
+        ...(searchTerm.trim() && { search: searchTerm.trim() }),
+        orderBy: "createdAt",
+        order: "DESC",
+        page: 1,
+        limit: 50,
+      });
+
+      const fetched = extractArray<ApiLabelPreset>(response).map(mapLabelPreset);
+      setPresets(fetched);
+    } catch (error) {
+      setProjectsError(
+        extractErrorMessage(error, "Failed to load label presets."),
+      );
+      setPresets(fallbackPresets);
+    } finally {
+      setPresetsLoading(false);
+    }
+  };
+
+  const mergeProjectMeta = (base: Project, project: ApiProject): Project => {
+    return {
+      ...base,
+      name: project.name,
+      description: project.description ?? undefined,
+      status: statusEnumToLabel(project.projectStatus),
+      dataType: dataTypeEnumToLabel(project.dataType),
+      createdAt: project.createdAt,
+    };
+  };
+
+  const handleCreate = async (event: FormEvent) => {
     event.preventDefault();
-    const now = new Date();
-    const createdAt = now.toISOString().slice(0, 10);
-    setProjects((prev) => [
-      {
-        id: crypto.randomUUID(),
+    setProjectsError(null);
+
+    if (selectedPresets.length === 0) {
+      setProjectsError("Select at least one label preset.");
+      return;
+    }
+
+    const availableLabelIds = Array.from(
+      new Set(
+        selectedPresets.flatMap((preset) => preset.labelIds),
+      ),
+    );
+    if (availableLabelIds.length === 0) {
+      setProjectsError("Selected presets have no labels.");
+      return;
+    }
+
+    try {
+      const createdResp = await createProject({
         name: projectName.trim() || "Untitled Project",
-        description: projectDescription.trim(),
-        status: "Drafting",
-        dataType: projectDataType,
-        createdAt,
-      },
-      ...prev,
-    ]);
-    setIsCreateOpen(false);
-    setProjectName("");
-    setProjectDescription("");
-    setProjectDataType("Image");
+        description: projectDescription.trim() || undefined,
+        dataType: dataTypeLabelToEnum(projectDataType),
+        availableLabelIds,
+      });
+
+      const created = unwrapApiResponse<ApiProject>(createdResp);
+      if (!created) {
+        throw new Error("Invalid create project response.");
+      }
+
+      const nextProject = normalizeProject(created);
+
+      setProjects((prev) => [nextProject, ...prev]);
+      setIsCreateOpen(false);
+      setProjectName("");
+      setProjectDescription("");
+      setProjectDataType("Image");
+      setCreatePresetSearch("");
+      setSelectedPresetIds([]);
+    } catch (error) {
+      setProjectsError(extractErrorMessage(error, "Failed to create project."));
+    }
   };
 
   const handleOpenEdit = (project: Project) => {
@@ -432,76 +622,63 @@ export default function ManagerProjectsPage({
     }, 200);
   };
 
-  const handleDeleteProject = (projectId: string) => {
-    setProjects((prev) => prev.filter((project) => project.id !== projectId));
+  const handleDeleteProject = async (projectId: string) => {
+    setProjectsError(null);
+
+    try {
+      await deleteProject(projectId);
+      setProjects((prev) => prev.filter((project) => project.id !== projectId));
+    } catch (error) {
+      setProjectsError(extractErrorMessage(error, "Failed to delete project."));
+    }
   };
 
-  const updateProjectStatus = (status: Project["status"]) => {
+  const saveProjectChanges = async () => {
     if (!activeProject) {
-      return;
+      return false;
     }
 
-    const nextName = editProjectName.trim() || activeProject.name;
-    const nextDescription = editProjectDescription.trim();
+    setProjectsError(null);
 
-    setProjects((prev) =>
-      prev.map((project) =>
-        project.id === activeProject.id
-          ? {
-              ...project,
-              name: nextName,
-              description: nextDescription,
-              dataType: editProjectDataType,
-              status,
-              uploadedFiles,
-              selectedPreset,
-              assignedAnnotatorIds,
-              assignedReviewerIds,
-              annotatorFileAssignments,
-              reviewerFileAssignments,
-            }
-          : project,
-      ),
-    );
-    setActiveProject((prev) =>
-      prev
-        ? {
-            ...prev,
-            name: nextName,
-            description: nextDescription,
-            dataType: editProjectDataType,
-            status,
-            uploadedFiles,
-            selectedPreset,
-            assignedAnnotatorIds,
-            assignedReviewerIds,
-            annotatorFileAssignments,
-            reviewerFileAssignments,
-          }
-        : prev,
-    );
-    setDetailProject((prev) =>
-      prev && prev.id === activeProject.id
-        ? {
-            ...prev,
-            name: nextName,
-            description: nextDescription,
-            dataType: editProjectDataType,
-            status,
-            uploadedFiles,
-            selectedPreset,
-            assignedAnnotatorIds,
-            assignedReviewerIds,
-            annotatorFileAssignments,
-            reviewerFileAssignments,
-          }
-        : prev,
-    );
+    try {
+      const updatedResp = await updateProject(activeProject.id, {
+        name: editProjectName.trim() || activeProject.name,
+        description: editProjectDescription.trim() || undefined,
+        dataType: dataTypeLabelToEnum(editProjectDataType),
+      });
+
+      const updated = unwrapApiResponse<ApiProject>(updatedResp);
+      if (!updated) {
+        throw new Error("Invalid update project response.");
+      }
+
+      setProjects((prev) =>
+        prev.map((project) =>
+          project.id === activeProject.id
+            ? mergeProjectMeta(project, updated)
+            : project,
+        ),
+      );
+      setActiveProject((prev) =>
+        prev ? mergeProjectMeta(prev, updated) : prev,
+      );
+      setDetailProject((prev) =>
+        prev && prev.id === activeProject.id
+          ? mergeProjectMeta(prev, updated)
+          : prev,
+      );
+      return true;
+    } catch (error) {
+      setProjectsError(extractErrorMessage(error, "Failed to update project."));
+      return false;
+    }
   };
 
-  const handleSaveAsDraft = () => {
-    updateProjectStatus("Drafting");
-    closeWithAnimation("editProject", setIsEditOpen);
+  const handleSaveAsDraft = async () => {
+    const saved = await saveProjectChanges();
+    if (saved) {
+      closeWithAnimation("editProject", setIsEditOpen);
+    }
   };
 
   const pushTaskToAnnotatorQueue = async () => {
@@ -547,7 +724,7 @@ export default function ManagerProjectsPage({
         "All required labels are added",
         "Quality self-check completed",
       ],
-      labels: selectedPreset?.labels ?? ["Label A", "Label B"],
+      labels: selectedPreset?.labelNames ?? ["Label A", "Label B"],
       assignedAnnotators: assignedNames,
       assignedReviewers: reviewerNames,
       assignedAnnotatorIds,
@@ -621,7 +798,10 @@ export default function ManagerProjectsPage({
         return;
       }
 
-      updateProjectStatus("Active");
+      const saved = await saveProjectChanges();
+      if (!saved) {
+        return;
+      }
       toast.success("Project assigned successfully.");
       closeWithAnimation("editProject", setIsEditOpen);
     } catch {
@@ -671,26 +851,65 @@ export default function ManagerProjectsPage({
     });
   };
 
-  useEffect(() => {
-    if (isAdmin || typeof window === "undefined") {
-      return;
+  const loadProjects = async () => {
+    setProjectsLoading(true);
+    setProjectsError(null);
+
+    try {
+      const response = await getProjectsPaginated({
+        ...(projectSearch.trim() && { search: projectSearch.trim() }),
+        ...(projectOrderBy === "Name" && { orderBy: "name" }),
+        ...(projectOrderBy === "Date created" && { orderBy: "createdAt" }),
+        ...(projectOrderBy === "Updated" && { orderBy: "updatedAt" }),
+        ...(projectOrder === "Ascending" && { order: "ASC" }),
+        ...(projectOrder === "Descending" && { order: "DESC" }),
+        page: currentPage,
+        limit: PAGE_LIMIT,
+      });
+
+      const fetched = extractArray<ApiProject>(response);
+      const pages = extractTotalPages(response);
+
+      const validated = await Promise.allSettled(
+        fetched.map(async (project) => {
+          try {
+            await getProjectById(project.id);
+            return project;
+          } catch (err) {
+            if (isNotFoundError(err)) {
+              return null;
+            }
+            return project;
+          }
+        }),
+      );
+
+      const filtered = validated
+        .map((result) => (result.status === "fulfilled" ? result.value : null))
+        .filter((project): project is ApiProject => project !== null)
+        .map(normalizeProject);
+
+      setProjects(filtered);
+      setTotalPages(pages || 1);
+    } catch (error) {
+      setProjectsError(extractErrorMessage(error, "Failed to load projects."));
+      setProjects([]);
+      setTotalPages(1);
+    } finally {
+      setProjectsLoading(false);
     }
-
-    localStorage.setItem(MANAGER_PROJECTS_STORAGE_KEY, JSON.stringify(projects));
-  }, [isAdmin, projects]);
+  };
 
   useEffect(() => {
-    const refreshPresets = () => {
-      setPresets(readManagerPresets());
-    };
+    void loadProjects();
+  }, [currentPage, projectOrder, projectOrderBy, projectSearch]);
 
-    window.addEventListener("storage", refreshPresets);
-    window.addEventListener(MANAGER_PRESETS_UPDATED_EVENT, refreshPresets);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [projectOrder, projectOrderBy, projectSearch]);
 
-    return () => {
-      window.removeEventListener("storage", refreshPresets);
-      window.removeEventListener(MANAGER_PRESETS_UPDATED_EVENT, refreshPresets);
-    };
+  useEffect(() => {
+    void loadPresets();
   }, []);
 
   useEffect(() => {
@@ -707,7 +926,7 @@ export default function ManagerProjectsPage({
     if (
       latest.name !== selectedPreset.name ||
       latest.description !== selectedPreset.description ||
-      latest.labels.join("|") !== selectedPreset.labels.join("|")
+      latest.labelIds.join("|") !== selectedPreset.labelIds.join("|")
     ) {
       setSelectedPreset(latest);
     }
@@ -729,20 +948,6 @@ export default function ManagerProjectsPage({
   }, []);
 
   useEffect(() => {
-    const refreshPresets = () => {
-      setPresets(readManagerPresets());
-    };
-
-    window.addEventListener("storage", refreshPresets);
-    window.addEventListener(MANAGER_PRESETS_UPDATED_EVENT, refreshPresets);
-
-    return () => {
-      window.removeEventListener("storage", refreshPresets);
-      window.removeEventListener(MANAGER_PRESETS_UPDATED_EVENT, refreshPresets);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!selectedPreset) {
       return;
     }
@@ -755,11 +960,23 @@ export default function ManagerProjectsPage({
     if (
       nextSelected.name !== selectedPreset.name ||
       nextSelected.description !== selectedPreset.description ||
-      nextSelected.labels.join("||") !== selectedPreset.labels.join("||")
+      nextSelected.labelIds.join("||") !== selectedPreset.labelIds.join("||")
     ) {
       setSelectedPreset(nextSelected);
     }
   }, [presets, selectedPreset]);
+
+  useEffect(() => {
+    if (isCreateOpen) {
+      void loadPresets(createPresetSearch);
+    }
+  }, [createPresetSearch, isCreateOpen]);
+
+  useEffect(() => {
+    if (isSelectPresetOpen) {
+      void loadPresets(presetSearch);
+    }
+  }, [presetSearch, isSelectPresetOpen]);
 
   return (
     <div className="w-full bg-white px-6 py-5">
@@ -794,6 +1011,8 @@ export default function ManagerProjectsPage({
               <path d="m21 21-4.3-4.3" />
             </svg>
             <input
+              value={projectSearch}
+              onChange={(event) => setProjectSearch(event.target.value)}
               className="w-full text-sm outline-none placeholder:text-gray-400"
               placeholder="Search projects..."
             />
@@ -804,11 +1023,19 @@ export default function ManagerProjectsPage({
           <label className="text-xs font-semibold text-gray-700">Status</label>
           <select
             title="Filter project status"
+            value={projectStatusFilter}
+            onChange={(event) =>
+              setProjectStatusFilter(
+                event.target.value as typeof projectStatusFilter,
+              )
+            }
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
           >
             <option>All</option>
+            <option>Drafting</option>
             <option>Active</option>
             <option>Archived</option>
+            <option>Completed</option>
           </select>
         </div>
 
@@ -816,6 +1043,10 @@ export default function ManagerProjectsPage({
           <label className="text-xs font-semibold text-gray-700">Order by</label>
           <select
             title="Order projects by"
+            value={projectOrderBy}
+            onChange={(event) =>
+              setProjectOrderBy(event.target.value as typeof projectOrderBy)
+            }
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
           >
             <option>Name</option>
@@ -828,16 +1059,29 @@ export default function ManagerProjectsPage({
           <label className="text-xs font-semibold text-gray-700">Order</label>
           <select
             title="Project sort order"
+            value={projectOrder}
+            onChange={(event) =>
+              setProjectOrder(event.target.value as typeof projectOrder)
+            }
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
           >
-            <option>All</option>
             <option>Ascending</option>
             <option>Descending</option>
           </select>
         </div>
       </div>
 
-      {!hasProjects ? (
+      {projectsError && (
+        <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {projectsError}
+        </div>
+      )}
+
+      {projectsLoading ? (
+        <div className="mt-6 rounded-lg border border-gray-200 bg-white px-5 py-12 text-center text-sm text-gray-500">
+          Loading projects...
+        </div>
+      ) : !hasProjects ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
             <svg
@@ -880,7 +1124,7 @@ export default function ManagerProjectsPage({
             <span>Action</span>
           </div>
 
-          {projects.map((project) => (
+          {visibleProjects.map((project) => (
             <div
               key={project.id}
               className="grid grid-cols-[1.6fr_2.2fr_1fr_1fr_1fr_0.8fr] items-center gap-2 border-b px-4 py-3 text-sm last:border-b-0"
@@ -901,13 +1145,6 @@ export default function ManagerProjectsPage({
               <span className="text-gray-700">{project.dataType}</span>
               <span className="text-gray-700">{project.createdAt}</span>
               <div className="flex items-center gap-3 text-sm font-semibold">
-                <button
-                  type="button"
-                  onClick={() => handleOpenDetails(project)}
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  Details
-                </button>
                 {isAdmin ? (
                   <button
                     type="button"
@@ -918,7 +1155,7 @@ export default function ManagerProjectsPage({
                   </button>
                 ) : (
                   <Link
-                    to={`/manager/projects/${project.id}`}
+                    to={`/manager/projects/${project.id}/edit`}
                     className="text-blue-600 hover:text-blue-700"
                   >
                     Edit
@@ -927,6 +1164,17 @@ export default function ManagerProjectsPage({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {hasProjects && !projectsLoading && totalPages > 1 && (
+        <div className="mt-6 flex justify-center">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => setCurrentPage(page)}
+            size="md"
+          />
         </div>
       )}
 
@@ -1008,6 +1256,62 @@ export default function ManagerProjectsPage({
                   <option value="Text">Text</option>
                   <option value="Audio">Audio</option>
                 </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-700">
+                  Label presets <span className="text-red-500">*</span>
+                </label>
+                <input
+                  value={createPresetSearch}
+                  onChange={(event) => setCreatePresetSearch(event.target.value)}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="Search presets..."
+                />
+                <div className="mt-2 max-h-48 space-y-2 overflow-y-auto rounded-md border border-gray-200 p-2">
+                  {presetsLoading ? (
+                    <p className="text-xs text-gray-400">Loading presets...</p>
+                  ) : presets.length === 0 ? (
+                    <p className="text-xs text-gray-400">No presets found.</p>
+                  ) : (
+                    presets
+                      .filter((preset) =>
+                        `${preset.name} ${preset.description ?? ""}`
+                          .toLowerCase()
+                          .includes(createPresetSearch.toLowerCase()),
+                      )
+                      .map((preset) => (
+                        <label
+                          key={preset.id}
+                          className="flex items-start justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+                        >
+                          <div>
+                            <p className="font-semibold text-gray-800">
+                              {preset.name}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {preset.description || "No description"}
+                            </p>
+                            <p className="mt-1 text-[11px] text-gray-400">
+                              {preset.labelIds.length} labels
+                            </p>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={selectedPresetIds.includes(preset.id)}
+                            onChange={() =>
+                              toggleSelection(preset.id, setSelectedPresetIds)
+                            }
+                          />
+                        </label>
+                      ))
+                  )}
+                </div>
+                {selectedPresetIds.length > 0 && (
+                  <p className="text-xs text-gray-500">
+                    {selectedPresetIds.length} preset(s) selected
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-end">
