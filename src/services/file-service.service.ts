@@ -130,3 +130,22 @@ export const deleteFile = async (id: string) => {
     throw error;
   }
 };
+
+export const getUnassignedFiles = async (
+  projectId: string,
+  role: string,
+  includeDeleted: boolean = false,
+) => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (role) queryParams.append("role", role);
+    if (includeDeleted)
+      queryParams.append("includeDeleted", includeDeleted.toString());
+    const resp = await api.get(
+      `/files/unassigned/${projectId}?${queryParams.toString()}`,
+    );
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};

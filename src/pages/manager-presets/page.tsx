@@ -1,17 +1,31 @@
 import {
   useEffect,
+  useMemo,
   useState,
   type Dispatch,
   type FormEvent,
   type SetStateAction,
 } from "react";
+import type { ApiResponse } from "../../interface/common/api-response.interface";
+import type { Label as ApiLabel } from "../../interface/label/label.interface";
+import type { LabelPreset as ApiLabelPreset } from "../../interface/label-preset/label-preset.interface";
+import {
+  createLabelPreset,
+  deleteLabelPreset,
+  getLabelPresetById,
+  getLabelPresetsPaginated,
+  updateLabelPreset,
+} from "../../services/label-preset-service.service";
+import { getAllLabels } from "../../services/label-service.service";
+import Pagination from "../../components/common/pagination";
 
 type Preset = {
   id: string;
   name: string;
   description?: string;
-  labels: string[];
+  labelIds: string[];
   createdAt: string;
+  updatedAt: string;
 };
 
 type ManagerPresetsPageProps = {
@@ -19,25 +33,12 @@ type ManagerPresetsPageProps = {
   initialPresets?: Preset[];
 };
 
-const MANAGER_PRESETS_STORAGE_KEY = "manager-presets";
-const MANAGER_PRESETS_UPDATED_EVENT = "manager-presets-updated";
+const PAGE_LIMIT = 10;
 
-const readManagerPresets = (): Preset[] => {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  const raw = localStorage.getItem(MANAGER_PRESETS_STORAGE_KEY);
-  if (!raw) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as Preset[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+type PaginationResult<T> = {
+  data: T[];
+  totalPages?: number;
+  pageCount?: number;
 };
 
 export default function ManagerPresetsPage({
@@ -45,45 +46,158 @@ export default function ManagerPresetsPage({
   initialPresets,
 }: ManagerPresetsPageProps) {
   const isAdmin = mode === "admin";
-  const [presets, setPresets] = useState<Preset[]>(() => {
-    if (isAdmin) {
-      return initialPresets ?? [];
-    }
-
-    const stored = readManagerPresets();
-    if (stored.length > 0) {
-      return stored;
-    }
-
-    return initialPresets ?? [];
-  });
+  const [presets, setPresets] = useState<Preset[]>(() => initialPresets ?? []);
   const hasPresets = presets.length > 0;
+  const [labels, setLabels] = useState<ApiLabel[]>([]);
+  const [presetsLoading, setPresetsLoading] = useState(false);
+  const [presetsError, setPresetsError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [search, setSearch] = useState("");
+  const [orderBy, setOrderBy] = useState<"Name" | "Date created" | "Updated">(
+    "Date created",
+  );
+  const [order, setOrder] = useState<"All" | "Ascending" | "Descending">(
+    "Descending",
+  );
   const [isCreatePresetOpen, setIsCreatePresetOpen] = useState(false);
   const [presetName, setPresetName] = useState("");
   const [presetDescription, setPresetDescription] = useState("");
   const [presetLabelQuery, setPresetLabelQuery] = useState("");
-  const [selectedPresetLabels, setSelectedPresetLabels] = useState<string[]>(
+  const [selectedPresetLabelIds, setSelectedPresetLabelIds] = useState<string[]>(
     [],
   );
+  const [labelSelectError, setLabelSelectError] = useState<string | null>(null);
   const [isEditPresetOpen, setIsEditPresetOpen] = useState(false);
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
   const [editPresetName, setEditPresetName] = useState("");
   const [editPresetDescription, setEditPresetDescription] = useState("");
   const [editPresetLabelQuery, setEditPresetLabelQuery] = useState("");
-  const [editSelectedPresetLabels, setEditSelectedPresetLabels] = useState<
+  const [editSelectedPresetLabelIds, setEditSelectedPresetLabelIds] = useState<
     string[]
   >([]);
+  const [editLabelSelectError, setEditLabelSelectError] = useState<string | null>(
+    null,
+  );
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailPreset, setDetailPreset] = useState<Preset | null>(null);
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
 
+  const labelMap = useMemo(() => {
+    return new Map(labels.map((label) => [label.id, label.name]));
+  }, [labels]);
+
+  const unwrapApiResponse = <T,>(payload: unknown): T | null => {
+    if (!payload || typeof payload !== "object") {
+      return payload as T;
+    }
+
+    if ("data" in payload) {
+      return (payload as ApiResponse<T>).data;
+    }
+
+    return payload as T;
+  };
+
+  const extractArray = <T,>(payload: unknown): T[] => {
+    const data = unwrapApiResponse<T[] | PaginationResult<T>>(payload);
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && typeof data === "object") {
+      const inner = data as PaginationResult<T>;
+      if (Array.isArray(inner.data)) {
+        return inner.data;
+      }
+    }
+    return [];
+  };
+
+  const extractTotalPages = (payload: unknown): number => {
+    const data = unwrapApiResponse<PaginationResult<unknown>>(payload);
+    if (data && typeof data === "object") {
+      return data.totalPages ?? data.pageCount ?? 1;
+    }
+    return 1;
+  };
+
+  const extractErrorMessage = (error: unknown, fallback: string) => {
+    const message = (error as { response?: { data?: { message?: unknown } } })
+      ?.response?.data?.message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+    return error instanceof Error ? error.message : fallback;
+  };
+
+  const normalizePresets = (apiPresets: ApiLabelPreset[]): Preset[] => {
+    return apiPresets.map((preset) => ({
+      id: preset.id,
+      name: preset.name,
+      description: preset.description ?? undefined,
+      labelIds: Array.isArray(preset.labels)
+        ? preset.labels.map((label) => label.id)
+        : [],
+      createdAt: preset.createdAt,
+      updatedAt: preset.updatedAt,
+    }));
+  };
+
+  const loadLabels = async () => {
+    try {
+      const resp = await getAllLabels({
+        orderBy: "name",
+        order: "ASC",
+      });
+      const labelList = extractArray<ApiLabel>(resp);
+      setLabels(labelList);
+    } catch (error) {
+      setLabels([]);
+      setPresetsError(
+        extractErrorMessage(error, "Failed to load labels for presets."),
+      );
+    }
+  };
+
+  const loadPresets = async () => {
+    setPresetsLoading(true);
+    setPresetsError(null);
+
+    try {
+      const resp = await getLabelPresetsPaginated({
+        ...(search.trim() && { search: search.trim() }),
+        ...(orderBy === "Name" && { orderBy: "name" }),
+        ...(orderBy === "Date created" && { orderBy: "createdAt" }),
+        ...(orderBy === "Updated" && { orderBy: "updatedAt" }),
+        ...(order === "Ascending" && { order: "ASC" }),
+        ...(order === "Descending" && { order: "DESC" }),
+        page: currentPage,
+        limit: PAGE_LIMIT,
+      });
+
+      const list = extractArray<ApiLabelPreset>(resp);
+      const pages = extractTotalPages(resp);
+      setPresets(normalizePresets(list));
+      setTotalPages(pages || 1);
+    } catch (error) {
+      setPresetsError(
+        extractErrorMessage(error, "Failed to load manager presets."),
+      );
+      setPresets([]);
+      setTotalPages(1);
+    } finally {
+      setPresetsLoading(false);
+    }
+  };
+
   const resetCreatePresetForm = () => {
     setPresetName("");
     setPresetDescription("");
     setPresetLabelQuery("");
-    setSelectedPresetLabels([]);
+    setSelectedPresetLabelIds([]);
+    setLabelSelectError(null);
   };
 
   const resetEditPresetForm = () => {
@@ -91,33 +205,41 @@ export default function ManagerPresetsPage({
     setEditPresetName("");
     setEditPresetDescription("");
     setEditPresetLabelQuery("");
-    setEditSelectedPresetLabels([]);
+    setEditSelectedPresetLabelIds([]);
+    setEditLabelSelectError(null);
   };
+
   useEffect(() => {
-    if (isAdmin || typeof window === "undefined") {
-      return;
-    }
+    void loadLabels();
+  }, []);
 
-    localStorage.setItem(MANAGER_PRESETS_STORAGE_KEY, JSON.stringify(presets));
-    window.dispatchEvent(new CustomEvent(MANAGER_PRESETS_UPDATED_EVENT));
-  }, [isAdmin, presets]);
+  useEffect(() => {
+    void loadPresets();
+  }, [currentPage, search, order, orderBy]);
 
-  const handleCreatePreset = (event: FormEvent) => {
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, order, orderBy]);
+
+  const handleCreatePreset = async (event: FormEvent) => {
     event.preventDefault();
-    const now = new Date();
-    const createdAt = now.toISOString().slice(0, 10);
-    setPresets((prev) => [
-      {
-        id: crypto.randomUUID(),
+    setPresetsError(null);
+
+    try {
+      await createLabelPreset({
         name: presetName.trim() || "Untitled Preset",
-        description: presetDescription.trim(),
-        labels: selectedPresetLabels,
-        createdAt,
-      },
-      ...prev,
-    ]);
-    setIsCreatePresetOpen(false);
-    resetCreatePresetForm();
+        description: presetDescription.trim() || undefined,
+        labelIds: selectedPresetLabelIds,
+      });
+      setIsCreatePresetOpen(false);
+      resetCreatePresetForm();
+      setCurrentPage(1);
+      await loadPresets();
+    } catch (error) {
+      setPresetsError(
+        extractErrorMessage(error, "Failed to create preset."),
+      );
+    }
   };
 
   const handleAddPresetLabel = () => {
@@ -125,21 +247,29 @@ export default function ManagerPresetsPage({
     if (!trimmed) {
       return;
     }
-    setSelectedPresetLabels((prev) =>
-      prev.includes(trimmed) ? prev : [...prev, trimmed],
+    const match = labels.find(
+      (label) => label.name.toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (!match) {
+      setLabelSelectError("Label not found.");
+      return;
+    }
+    setSelectedPresetLabelIds((prev) =>
+      prev.includes(match.id) ? prev : [...prev, match.id],
     );
     setPresetLabelQuery("");
+    setLabelSelectError(null);
   };
 
-  const handleRemovePresetLabel = (label: string) => {
-    setSelectedPresetLabels((prev) => prev.filter((item) => item !== label));
+  const handleRemovePresetLabel = (labelId: string) => {
+    setSelectedPresetLabelIds((prev) => prev.filter((item) => item !== labelId));
   };
 
   const handleOpenEditPreset = (preset: Preset) => {
     setEditingPresetId(preset.id);
     setEditPresetName(preset.name);
     setEditPresetDescription(preset.description ?? "");
-    setEditSelectedPresetLabels(preset.labels);
+    setEditSelectedPresetLabelIds(preset.labelIds);
     setEditPresetLabelQuery("");
     setIsEditPresetOpen(true);
   };
@@ -149,50 +279,83 @@ export default function ManagerPresetsPage({
     if (!trimmed) {
       return;
     }
-    setEditSelectedPresetLabels((prev) =>
-      prev.includes(trimmed) ? prev : [...prev, trimmed],
+    const match = labels.find(
+      (label) => label.name.toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (!match) {
+      setEditLabelSelectError("Label not found.");
+      return;
+    }
+    setEditSelectedPresetLabelIds((prev) =>
+      prev.includes(match.id) ? prev : [...prev, match.id],
     );
     setEditPresetLabelQuery("");
+    setEditLabelSelectError(null);
   };
 
-  const handleRemoveEditPresetLabel = (label: string) => {
-    setEditSelectedPresetLabels((prev) =>
-      prev.filter((item) => item !== label),
+  const handleRemoveEditPresetLabel = (labelId: string) => {
+    setEditSelectedPresetLabelIds((prev) =>
+      prev.filter((item) => item !== labelId),
     );
   };
 
-  const handleUpdatePreset = (event: FormEvent) => {
+  const handleUpdatePreset = async (event: FormEvent) => {
     event.preventDefault();
     if (!editingPresetId) {
       return;
     }
-    setPresets((prev) =>
-      prev.map((preset) =>
-        preset.id === editingPresetId
-          ? {
-              ...preset,
-              name: editPresetName.trim() || "Untitled Preset",
-              description: editPresetDescription.trim(),
-              labels: editSelectedPresetLabels,
-            }
-          : preset,
-      ),
-    );
-    setIsEditPresetOpen(false);
-    setEditingPresetId(null);
-    setEditPresetName("");
-    setEditPresetDescription("");
-    setEditPresetLabelQuery("");
-    setEditSelectedPresetLabels([]);
+    setPresetsError(null);
+
+    try {
+      await updateLabelPreset(editingPresetId, {
+        name: editPresetName.trim() || "Untitled Preset",
+        description: editPresetDescription.trim() || undefined,
+        labelIds: editSelectedPresetLabelIds,
+      });
+      setIsEditPresetOpen(false);
+      resetEditPresetForm();
+      await loadPresets();
+    } catch (error) {
+      setPresetsError(
+        extractErrorMessage(error, "Failed to update preset."),
+      );
+    }
   };
 
-  const handleOpenPresetDetails = (preset: Preset) => {
-    setDetailPreset(preset);
-    setIsDetailOpen(true);
+  const handleOpenPresetDetails = async (preset: Preset) => {
+    setPresetsError(null);
+
+    try {
+      const resp = await getLabelPresetById(preset.id);
+      const detail = unwrapApiResponse<ApiLabelPreset>(resp);
+      if (!detail) {
+        throw new Error("Preset not found.");
+      }
+      const normalized = normalizePresets([detail])[0];
+      setDetailPreset(normalized);
+      setIsDetailOpen(true);
+    } catch (error) {
+      setPresetsError(
+        extractErrorMessage(error, "Failed to load preset details."),
+      );
+    }
   };
 
   const handleDeletePreset = (presetId: string) => {
-    setPresets((prev) => prev.filter((preset) => preset.id !== presetId));
+    const removePreset = async () => {
+      setPresetsError(null);
+
+      try {
+        await deleteLabelPreset(presetId);
+        setPresets((prev) => prev.filter((preset) => preset.id !== presetId));
+      } catch (error) {
+        setPresetsError(
+          extractErrorMessage(error, "Failed to delete preset."),
+        );
+      }
+    };
+
+    void removePreset();
   };
 
   const closeWithAnimation = (
@@ -248,6 +411,8 @@ export default function ManagerPresetsPage({
             <input
               className="w-full text-sm outline-none placeholder:text-gray-400"
               placeholder="Search presets..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
             />
           </div>
         </div>
@@ -257,6 +422,10 @@ export default function ManagerPresetsPage({
           <select
             title="Order presets by"
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+            value={orderBy}
+            onChange={(event) =>
+              setOrderBy(event.target.value as "Name" | "Date created" | "Updated")
+            }
           >
             <option>Name</option>
             <option>Date created</option>
@@ -269,6 +438,12 @@ export default function ManagerPresetsPage({
           <select
             title="Preset sort order"
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+            value={order}
+            onChange={(event) =>
+              setOrder(
+                event.target.value as "All" | "Ascending" | "Descending",
+              )
+            }
           >
             <option>All</option>
             <option>Ascending</option>
@@ -289,7 +464,17 @@ export default function ManagerPresetsPage({
         </div>
       </div>
 
-      {!hasPresets ? (
+      {presetsError && (
+        <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {presetsError}
+        </div>
+      )}
+
+      {presetsLoading ? (
+        <div className="mt-6 rounded-lg border border-gray-200 bg-white px-5 py-12 text-center text-sm text-gray-500">
+          Loading presets...
+        </div>
+      ) : !hasPresets ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
             <svg
@@ -347,19 +532,10 @@ export default function ManagerPresetsPage({
                   {preset.description || "No description"}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {preset.labels.length === 0 ? (
-                  <span className="text-xs text-gray-400">No labels</span>
-                ) : (
-                  preset.labels.map((label) => (
-                    <span
-                      key={label}
-                      className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
-                    >
-                      {label}
-                    </span>
-                  ))
-                )}
+              <div className="flex items-center">
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                  {preset.labelIds.length}
+                </span>
               </div>
               <span className="text-gray-700">{preset.createdAt}</span>
               <div className="flex items-center gap-3 text-sm font-semibold">
@@ -390,6 +566,17 @@ export default function ManagerPresetsPage({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {hasPresets && !presetsLoading && totalPages > 1 && (
+        <div className="mt-6 flex justify-center">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => setCurrentPage(page)}
+            size="md"
+          />
         </div>
       )}
 
@@ -466,6 +653,7 @@ export default function ManagerPresetsPage({
                     }
                     className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
                     placeholder="Search labels to add..."
+                    list="preset-label-options"
                   />
                   <button
                     type="button"
@@ -475,6 +663,9 @@ export default function ManagerPresetsPage({
                     Add
                   </button>
                 </div>
+                {labelSelectError && (
+                  <p className="text-xs text-red-500">{labelSelectError}</p>
+                )}
               </div>
 
               <div className="rounded-md border border-gray-200 p-3">
@@ -482,22 +673,22 @@ export default function ManagerPresetsPage({
                   Selected labels
                 </span>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {selectedPresetLabels.length === 0 && (
+                  {selectedPresetLabelIds.length === 0 && (
                     <span className="text-xs text-gray-400">
                       No labels selected
                     </span>
                   )}
-                  {selectedPresetLabels.map((label) => (
+                  {selectedPresetLabelIds.map((labelId) => (
                     <span
-                      key={label}
+                      key={labelId}
                       className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
                     >
-                      {label}
+                      {labelMap.get(labelId) ?? "Unknown"}
                       <button
                         type="button"
-                        onClick={() => handleRemovePresetLabel(label)}
+                        onClick={() => handleRemovePresetLabel(labelId)}
                         className="text-red-500 hover:text-red-600"
-                        aria-label={`Remove ${label}`}
+                        aria-label={`Remove ${labelMap.get(labelId) ?? "label"}`}
                       >
                         ✕
                       </button>
@@ -505,6 +696,12 @@ export default function ManagerPresetsPage({
                   ))}
                 </div>
               </div>
+
+              <datalist id="preset-label-options">
+                {labels.map((label) => (
+                  <option key={label.id} value={label.name} />
+                ))}
+              </datalist>
 
               <div className="flex justify-end">
                 <button
@@ -583,6 +780,7 @@ export default function ManagerPresetsPage({
                     onChange={(event) => setEditPresetLabelQuery(event.target.value)}
                     className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
                     placeholder="Label name..."
+                    list="edit-preset-label-options"
                   />
                   <button
                     type="button"
@@ -592,25 +790,28 @@ export default function ManagerPresetsPage({
                     Add
                   </button>
                 </div>
+                {editLabelSelectError && (
+                  <p className="text-xs text-red-500">{editLabelSelectError}</p>
+                )}
               </div>
 
               <div className="rounded-md border border-gray-200 p-3">
                 <span className="text-xs font-semibold text-gray-700">Selected labels</span>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {editSelectedPresetLabels.length === 0 && (
+                  {editSelectedPresetLabelIds.length === 0 && (
                     <span className="text-xs text-gray-400">No labels selected</span>
                   )}
-                  {editSelectedPresetLabels.map((label) => (
+                  {editSelectedPresetLabelIds.map((labelId) => (
                     <span
-                      key={label}
+                      key={labelId}
                       className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
                     >
-                      {label}
+                      {labelMap.get(labelId) ?? "Unknown"}
                       <button
                         type="button"
-                        onClick={() => handleRemoveEditPresetLabel(label)}
+                        onClick={() => handleRemoveEditPresetLabel(labelId)}
                         className="text-red-500 hover:text-red-600"
-                        aria-label={`Remove ${label}`}
+                        aria-label={`Remove ${labelMap.get(labelId) ?? "label"}`}
                       >
                         ✕
                       </button>
@@ -618,6 +819,12 @@ export default function ManagerPresetsPage({
                   ))}
                 </div>
               </div>
+
+              <datalist id="edit-preset-label-options">
+                {labels.map((label) => (
+                  <option key={label.id} value={label.name} />
+                ))}
+              </datalist>
 
               <div className="flex justify-end gap-2">
                 <button
@@ -676,7 +883,7 @@ export default function ManagerPresetsPage({
                     </p>
                   </div>
                   <span className="rounded-md bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-                    {detailPreset.labels.length} labels
+                    {detailPreset.labelIds.length} labels
                   </span>
                 </div>
               </div>
@@ -692,15 +899,15 @@ export default function ManagerPresetsPage({
                 <div className="rounded-md border border-gray-200 p-3">
                   <p className="text-xs font-semibold text-gray-700">Labels</p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {detailPreset.labels.length === 0 ? (
+                    {detailPreset.labelIds.length === 0 ? (
                       <span className="text-xs text-gray-400">No labels</span>
                     ) : (
-                      detailPreset.labels.map((label) => (
+                      detailPreset.labelIds.map((labelId) => (
                         <span
-                          key={label}
+                          key={labelId}
                           className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
                         >
-                          {label}
+                          {labelMap.get(labelId) ?? "Unknown"}
                         </span>
                       ))
                     )}

@@ -94,6 +94,12 @@ export const router: RouterItem[] = [
         Component: React.lazy(() => import("../pages/manager-labels/page")),
       },
       {
+        path: "labels/:id",
+        Component: React.lazy(
+          () => import("../pages/manager-label-detail/page"),
+        ),
+      },
+      {
         path: "presets",
         Component: React.lazy(() => import("../pages/manager-presets/page")),
       },
@@ -102,8 +108,10 @@ export const router: RouterItem[] = [
         Component: React.lazy(() => import("../pages/manager-dashboard/page")),
       },
       {
-        path: "projects/:id",
-        Component: React.lazy(() => import("../pages/project-detail/page")),
+        path: "projects/:id/edit",
+        Component: React.lazy(
+          () => import("../pages/manager-project-edit/page"),
+        ),
       },
     ],
   },
