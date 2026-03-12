@@ -1,4 +1,3 @@
-import axios from "axios";
 import api, { refreshApi } from "../api/axios";
 
 export const login = async (username: string, password: string) => {

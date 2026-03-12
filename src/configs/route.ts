@@ -51,7 +51,9 @@ export const router: RouterItem[] = [
     children: [
       {
         path: "dashboard",
-        Component: React.lazy(() => import("../pages/admin-dashboard/page")),
+        Component: React.lazy(
+          () => import("../pages/admin-dashboard/page"),
+        ),
       },
       {
         path: "accounts",
@@ -108,11 +110,15 @@ export const router: RouterItem[] = [
       () => import("../components/common/layout/simple-layout"),
     ),
     path: "/reviewer",
-    Component: React.lazy(() => import("../pages/reviewer-queue/page")),
+    Component: React.lazy(() => import("../pages/reviewer-home/page")),
     sidebar: React.lazy(
       () => import("../components/common/sidebar/reviewer-sidebar"),
     ),
     children: [
+      {
+        path: "queue",
+        Component: React.lazy(() => import("../pages/reviewer-queue/page")),
+      },
       {
         path: "workspace/:id",
         Component: React.lazy(() => import("../pages/reviewer-workspace/page")),

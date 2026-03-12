@@ -1,4 +1,4 @@
-import { CreateReviewDto } from "./create-review.dto";
+import type { CreateReviewDto } from "./create-review.dto";
 
 /**
  * Update Review DTO - All fields from CreateReviewDto are optional

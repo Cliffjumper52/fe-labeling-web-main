@@ -76,7 +76,7 @@ export const getProjectsPaginated = async (filter: FilterProjectQueryDto) => {
     if (filter.order) queryParams.append("order", filter.order);
     if (filter.includeDeleted !== undefined)
       queryParams.append("includeDeleted", filter.includeDeleted.toString());
-    const resp = await api.get(`/projects/manager?${queryParams.toString()}`);
+    const resp = await api.get(`/projects?${queryParams.toString()}`);
     return resp.data;
   } catch (error) {
     throw error;

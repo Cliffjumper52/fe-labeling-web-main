@@ -337,30 +337,6 @@ export default function ManagerProjectsPage({
     setProjectDataType("Image");
   };
 
-  const handleOpenEdit = (project: Project) => {
-    setActiveProject(project);
-    setEditProjectName(project.name);
-    setEditProjectDescription(project.description ?? "");
-    setEditProjectDataType(project.dataType);
-    const annotatorIds = project.assignedAnnotatorIds ?? [];
-    const reviewerIds = project.assignedReviewerIds ?? [];
-    setSelectedAnnotatorId(annotatorIds.length === 1 ? annotatorIds[0] : null);
-    setSelectedReviewerId(reviewerIds.length === 1 ? reviewerIds[0] : null);
-    setSelectedAnnotatorFiles([]);
-    setSelectedReviewerFiles([]);
-    setAnnotatorFileAssignments(project.annotatorFileAssignments ?? {});
-    setReviewerFileAssignments(project.reviewerFileAssignments ?? {});
-    setSelectedPreset(project.selectedPreset ?? null);
-    setUploadedFiles(project.uploadedFiles ?? []);
-    setUploadedImages([]);
-    setUploadedImageFiles([]);
-    setIsEditOpen(true);
-    setIsUploadOpen(false);
-    setIsAssignAnnotatorsOpen(false);
-    setIsAssignReviewersOpen(false);
-    setIsSelectPresetOpen(false);
-  };
-
   const handleOpenDetails = (project: Project) => {
     setDetailProject(project);
     setIsDetailOpen(true);

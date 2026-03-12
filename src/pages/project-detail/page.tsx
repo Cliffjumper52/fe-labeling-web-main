@@ -379,24 +379,6 @@ export default function ProjectDetail() {
     );
   };
 
-  const toggleFileAssignment = (
-    fileName: string,
-    memberId: string,
-    setter: (updater: (prev: Record<string, string[]>) => Record<string, string[]>) => void,
-  ) => {
-    setter((prev) => {
-      const existing = prev[fileName] ?? [];
-      const next = existing.includes(memberId)
-        ? existing.filter((item) => item !== memberId)
-        : [...existing, memberId];
-      const updated = { ...prev, [fileName]: next };
-      if (next.length === 0) {
-        delete updated[fileName];
-      }
-      return updated;
-    });
-  };
-
   const applyMemberAssignments = (
     selectedFiles: string[],
     memberId: string,
