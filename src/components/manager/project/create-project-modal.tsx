@@ -13,6 +13,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  isCreating: boolean;
   projectName: string;
   projectDescription: string;
   projectDataType: DataType;
@@ -34,6 +35,7 @@ export default function CreateProjectModal({
   open,
   onClose,
   onSubmit,
+  isCreating,
   projectName,
   projectDescription,
   projectDataType,
@@ -66,7 +68,7 @@ export default function CreateProjectModal({
   }, [createPresetSearch, presets]);
 
   const handleOverlayClick = (event: MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) {
+    if (!isCreating && event.target === event.currentTarget) {
       onClose();
     }
   };
@@ -92,8 +94,9 @@ export default function CreateProjectModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
             aria-label="Close"
+            disabled={isCreating}
           >
             <svg
               viewBox="0 0 24 24"
@@ -109,6 +112,7 @@ export default function CreateProjectModal({
         </div>
 
         <form onSubmit={onSubmit} className="flex flex-col gap-4 p-4">
+          <fieldset disabled={isCreating} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-gray-700">
               Project name
@@ -248,12 +252,41 @@ export default function CreateProjectModal({
           <div className="flex justify-end">
             <button
               type="submit"
-              className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+              disabled={isCreating}
+              className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <span className="text-base leading-none">+</span>
-              Create Project
+              {isCreating ? (
+                <>
+                  <svg
+                    className="h-4 w-4 animate-spin"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      className="opacity-25"
+                    />
+                    <path
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                      fill="currentColor"
+                      className="opacity-75"
+                    />
+                  </svg>
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <span className="text-base leading-none">+</span>
+                  Create Project
+                </>
+              )}
             </button>
           </div>
+          </fieldset>
         </form>
       </div>
     </div>,
