@@ -138,6 +138,7 @@ export default function ManagerProjectsPage() {
   const [presets, setPresets] = useState<ManagerLabelPresetOption[]>([]);
   const [presetsLoading, setPresetsLoading] = useState(false);
   const [selectedPresetIds, setSelectedPresetIds] = useState<string[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
 
   const user = getUserInfo();
   const visibleProjects = useMemo(() => {
@@ -268,6 +269,7 @@ export default function ManagerProjectsPage() {
       return;
     }
 
+    setIsCreating(true);
     try {
       const createdResponse = await createProject(
         {
@@ -290,6 +292,8 @@ export default function ManagerProjectsPage() {
       closeCreateModal();
     } catch (error) {
       setProjectsError(extractErrorMessage(error, "Failed to create project."));
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -351,6 +355,7 @@ export default function ManagerProjectsPage() {
         open={isCreateOpen}
         onClose={closeCreateModal}
         onSubmit={handleCreate}
+        isCreating={isCreating}
         projectName={projectName}
         projectDescription={projectDescription}
         projectDataType={projectDataType}
