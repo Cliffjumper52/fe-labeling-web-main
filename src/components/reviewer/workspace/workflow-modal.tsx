@@ -6,6 +6,7 @@ import type { ReviewErrorType } from "../../../interface/review-error-type/revie
 import { Severity } from "../../../interface/review-error-type/enums/severity.enums";
 import type { SubmitReviewErrorDto } from "../../../services/review-service.service";
 import { useNavigate } from "react-router";
+import { ConfirmButton } from "../../common/confirm-modal";
 
 export type WorkflowModalMode = "view" | "review";
 
@@ -130,6 +131,13 @@ export default function WorkflowModal({
   onSubmitReview,
 }: Props) {
   const navigate = useNavigate();
+  const disableSubmitReview =
+    submittingReview ||
+    loadingReviewChecklistQuestions ||
+    Boolean(reviewChecklistQuestionsError) ||
+    reviewChecklistQuestions.length === 0 ||
+    hasMissingRequiredChecklist;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
       <div className="w-full max-w-3xl rounded-lg border border-gray-300 bg-white shadow-xl">
@@ -603,20 +611,17 @@ export default function WorkflowModal({
           </button>
 
           {mode === "review" ? (
-            <button
-              type="button"
-              onClick={onSubmitReview}
-              disabled={
-                submittingReview ||
-                loadingReviewChecklistQuestions ||
-                Boolean(reviewChecklistQuestionsError) ||
-                reviewChecklistQuestions.length === 0 ||
-                hasMissingRequiredChecklist
-              }
-              className="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
-            >
-              {submittingReview ? "Submitting..." : "Submit Review"}
-            </button>
+            <ConfirmButton
+              label={submittingReview ? "Submitting..." : "Submit Review"}
+              variant="primary"
+              size="sm"
+              className="!rounded-md"
+              disabled={disableSubmitReview}
+              modalHeader="Submit this review?"
+              modalBody={`You are about to submit a ${reviewDecision} decision for label "${labelName}".`}
+              confirmLabel="Submit review"
+              onConfirm={onSubmitReview}
+            />
           ) : null}
         </div>
       </div>

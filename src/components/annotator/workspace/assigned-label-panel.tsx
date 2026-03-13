@@ -1,5 +1,6 @@
 import type { File as ProjectFile } from "../../../interface/file/file.interface";
 import type { FileLabel } from "../../../interface/file-label/file-label.interface";
+import { ConfirmButton } from "../../common/confirm-modal";
 
 export type AssignedLabelsWorkflowMode = "assign" | "resubmit" | "view";
 
@@ -244,14 +245,18 @@ export default function AssignedLabelsPanel({
           </p>
         ) : null}
 
-        <button
-          type="button"
-          onClick={onSubmitFileForReview}
+        <ConfirmButton
+          label={
+            submittingFileForReview ? "Submitting..." : "Submit file for review"
+          }
+          variant="success"
+          className="mt-3 !w-full !justify-center"
           disabled={!canSubmitFileForReview || submittingFileForReview}
-          className="mt-3 w-full rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
-        >
-          {submittingFileForReview ? "Submitting..." : "Submit file for review"}
-        </button>
+          modalHeader="Submit file for review?"
+          modalBody={`Submit "${selectedFile?.fileName || selectedFile?.id || "this file"}" for review? Once submitted, labels cannot be changed until the reviewer returns the file.`}
+          confirmLabel="Submit"
+          onConfirm={onSubmitFileForReview}
+        />
 
         {!canSubmitFileForReview && selectedFile ? (
           <p className="mt-1 text-[11px] text-gray-500">

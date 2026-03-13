@@ -4,6 +4,7 @@ import {
   deleteLabel,
   getLabelPaginated,
 } from "../../services/label-service.service";
+import { ConfirmButton } from "../../components/common/confirm-modal";
 
 type ApiEnvelope<T> = { data?: T; message?: string | string[] };
 type PaginatedPayload<T> = {
@@ -66,7 +67,6 @@ export default function AdminLabelsPage() {
   }, []);
 
   const onDelete = async (id: string) => {
-    if (!window.confirm("Delete this label?")) return;
     try {
       await deleteLabel(id);
       toast.success("Label deleted");
@@ -142,13 +142,16 @@ export default function AdminLabelsPage() {
                 >
                   Detail
                 </button>
-                <button
-                  type="button"
-                  className="text-red-600 hover:text-red-700"
-                  onClick={() => void onDelete(item.id)}
-                >
-                  Delete
-                </button>
+                <ConfirmButton
+                  label="Delete"
+                  variant="danger"
+                  size="sm"
+                  className="!h-auto !border-0 !bg-transparent !p-0 text-red-600 hover:text-red-700 hover:!bg-transparent"
+                  modalHeader="Delete this label?"
+                  modalBody={`Are you sure you want to delete ${item.name}? This action cannot be undone.`}
+                  confirmLabel="Delete"
+                  onConfirm={() => onDelete(item.id)}
+                />
               </div>
             </div>
           ))

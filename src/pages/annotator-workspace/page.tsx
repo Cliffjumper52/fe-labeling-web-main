@@ -723,14 +723,6 @@ export default function AnnotatorWorkspacePage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Submit "${selectedFile.fileName || selectedFile.id}" for review?\nOnce submitted, you will not be able to modify its labels until the reviewer returns it.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     setSubmittingFileForReview(true);
     setSubmitFileForReviewError(null);
 

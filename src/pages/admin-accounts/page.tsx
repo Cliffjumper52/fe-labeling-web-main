@@ -12,6 +12,7 @@ import {
   fetchAdminAccounts,
   updateAdminAccount,
 } from "../../services/admin-service";
+import { ConfirmButton } from "../../components/common/confirm-modal";
 
 type AdminUser = {
   id: string;
@@ -19,7 +20,6 @@ type AdminUser = {
   email: string;
   role: "Admin" | "Manager" | "Reviewer" | "Annotator";
   status: "Active" | "Suspended";
-  phone: string;
 };
 
 export default function AdminAccountsPage() {
@@ -31,7 +31,6 @@ export default function AdminAccountsPage() {
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserRole, setNewUserRole] =
     useState<AdminUser["role"]>("Annotator");
-  const [newUserPhone, setNewUserPhone] = useState("");
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editUserName, setEditUserName] = useState("");
@@ -40,7 +39,6 @@ export default function AdminAccountsPage() {
     useState<AdminUser["role"]>("Annotator");
   const [editUserStatus, setEditUserStatus] =
     useState<AdminUser["status"]>("Active");
-  const [editUserPhone, setEditUserPhone] = useState("");
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
@@ -54,7 +52,6 @@ export default function AdminAccountsPage() {
         email: newUserEmail.trim(),
         role: newUserRole,
         status: "Active",
-        phone: newUserPhone.trim(),
       });
       setUsers((prev) => [created as AdminUser, ...prev]);
       toast.success("User created successfully.");
@@ -67,7 +64,6 @@ export default function AdminAccountsPage() {
     setNewUserName("");
     setNewUserEmail("");
     setNewUserRole("Annotator");
-    setNewUserPhone("");
   };
 
   useEffect(() => {
@@ -129,7 +125,6 @@ export default function AdminAccountsPage() {
     setEditUserEmail("");
     setEditUserRole("Annotator");
     setEditUserStatus("Active");
-    setEditUserPhone("");
   };
 
   const handleOpenEdit = (user: AdminUser) => {
@@ -138,7 +133,6 @@ export default function AdminAccountsPage() {
     setEditUserEmail(user.email);
     setEditUserRole(user.role);
     setEditUserStatus(user.status);
-    setEditUserPhone(user.phone);
     setIsEditUserOpen(true);
   };
 
@@ -153,7 +147,6 @@ export default function AdminAccountsPage() {
       email: editUserEmail.trim(),
       role: editUserRole,
       status: editUserStatus,
-      phone: editUserPhone.trim(),
     };
 
     try {
@@ -328,13 +321,16 @@ export default function AdminAccountsPage() {
                 >
                   Edit
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteUser(user.id)}
-                  className="text-red-500 hover:text-red-600"
-                >
-                  Delete
-                </button>
+                <ConfirmButton
+                  label="Delete"
+                  variant="danger"
+                  size="sm"
+                  className="!h-auto !border-0 !bg-transparent !p-0 text-red-500 hover:text-red-600 hover:!bg-transparent"
+                  modalHeader="Delete this account?"
+                  modalBody={`Are you sure you want to delete ${user.name}? This action cannot be undone.`}
+                  confirmLabel="Delete"
+                  onConfirm={() => handleDeleteUser(user.id)}
+                />
               </div>
             </div>
           ))}
@@ -424,22 +420,6 @@ export default function AdminAccountsPage() {
                   <option>Reviewer</option>
                   <option>Annotator</option>
                 </select>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">
-                  Phone number
-                </label>
-                <input
-                  type="tel"
-                  value={newUserPhone}
-                  onChange={(event) => setNewUserPhone(event.target.value)}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="+1 555 000 1234"
-                  pattern="^\+?[0-9\s-]{8,15}$"
-                  title="Use 8-15 digits; spaces, dashes, and optional leading + are allowed"
-                  required
-                />
               </div>
 
               <div className="flex items-center justify-end gap-2">
@@ -564,22 +544,6 @@ export default function AdminAccountsPage() {
                   <option>Active</option>
                   <option>Suspended</option>
                 </select>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">
-                  Phone number
-                </label>
-                <input
-                  type="tel"
-                  value={editUserPhone}
-                  onChange={(event) => setEditUserPhone(event.target.value)}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="+1 555 000 1234"
-                  pattern="^\+?[0-9\s-]{8,15}$"
-                  title="Use 8-15 digits; spaces, dashes, and optional leading + are allowed"
-                  required
-                />
               </div>
 
               <div className="flex items-center justify-end gap-2">

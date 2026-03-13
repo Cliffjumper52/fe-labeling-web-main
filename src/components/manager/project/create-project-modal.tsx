@@ -149,9 +149,15 @@ export default function CreateProjectModal({
               className="rounded-md border border-gray-300 px-3 py-2 text-sm"
             >
               <option value="image">Image</option>
-              <option value="video">Video</option>
-              <option value="text">Text</option>
-              <option value="audio">Audio</option>
+              <option value="Video" disabled>
+                Video (coming soon)
+              </option>
+              <option value="Text" disabled>
+                Text (coming soon)
+              </option>
+              <option value="Audio" disabled>
+                Audio (coming soon)
+              </option>
             </select>
           </div>
 

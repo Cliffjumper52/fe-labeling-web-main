@@ -7,6 +7,7 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
+import { ConfirmButton } from "../../common/confirm-modal";
 import type { File as ApiFile } from "../../../interface/file/file.interface";
 import type {
   ManagerProjectEditAvailableLabel,
@@ -166,6 +167,13 @@ export default function ProjectEditSections({
 
     onOpenLabelConfig();
   };
+
+  const disableCompleteProject =
+    saving ||
+    configSaving ||
+    completingProject ||
+    isProjectCompleted ||
+    !isReadyToComplete;
 
   return (
     <>
@@ -477,24 +485,22 @@ export default function ProjectEditSections({
         >
           Cancel
         </button>
-        <button
-          type="button"
-          onClick={onCompleteProject}
-          disabled={
-            saving ||
-            configSaving ||
-            completingProject ||
-            isProjectCompleted ||
-            !isReadyToComplete
+        <ConfirmButton
+          label={
+            isProjectCompleted
+              ? "Project completed"
+              : completingProject
+                ? "Completing..."
+                : "Complete project"
           }
-          className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
-        >
-          {isProjectCompleted
-            ? "Project completed"
-            : completingProject
-              ? "Completing..."
-              : "Complete project"}
-        </button>
+          variant="primary"
+          className="!rounded-md"
+          disabled={disableCompleteProject}
+          modalHeader="Complete this project?"
+          modalBody="This will mark the project as completed. Make sure all files are fully approved before continuing."
+          confirmLabel="Complete project"
+          onConfirm={onCompleteProject}
+        />
       </div>
     </>
   );

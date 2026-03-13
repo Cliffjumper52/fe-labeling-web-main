@@ -1,4 +1,9 @@
-import { getAllAccounts, createAccount, updateAccount, deleteAccount } from "./account-service.service";
+import {
+  getAllAccounts,
+  createAccount,
+  updateAccount,
+  deleteAccount,
+} from "./account-service.service";
 import {
   createProject,
   deleteProject,
@@ -32,7 +37,6 @@ export type AdminAccountUi = {
   email: string;
   role: RoleUi;
   status: StatusUi;
-  phone: string;
 };
 
 export type AdminProjectUi = {
@@ -81,7 +85,11 @@ const ensureArray = (value: unknown): Record<string, unknown>[] => {
         return candidate as Record<string, unknown>[];
       }
       // Handle nested paginated shape: { data: { data: [...] } }
-      if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+      if (
+        candidate &&
+        typeof candidate === "object" &&
+        !Array.isArray(candidate)
+      ) {
         const nested = candidate as Record<string, unknown>;
         const inner = [nested.items, nested.data, nested.results, nested.rows];
         for (const innerCandidate of inner) {
@@ -103,7 +111,8 @@ const roleToUi = (role: unknown): RoleUi => {
   return "Annotator";
 };
 
-const roleToApi = (role: RoleUi) => role.toLowerCase() as "admin" | "manager" | "reviewer" | "annotator";
+const roleToApi = (role: RoleUi) =>
+  role.toLowerCase() as "admin" | "manager" | "reviewer" | "annotator";
 
 const statusToUi = (status: unknown): StatusUi => {
   const normalized = String(status ?? "active").toLowerCase();
@@ -134,7 +143,8 @@ const projectTypeToUi = (type: unknown): ProjectTypeUi => {
   return "Image";
 };
 
-const projectTypeToApi = (type: ProjectTypeUi) => type.toLowerCase() as "image" | "video" | "text" | "audio";
+const projectTypeToApi = (type: ProjectTypeUi) =>
+  type.toLowerCase() as "image" | "video" | "text" | "audio";
 
 const mapAccount = (item: Record<string, unknown>): AdminAccountUi => ({
   id: String(item.id ?? crypto.randomUUID()),
@@ -142,7 +152,6 @@ const mapAccount = (item: Record<string, unknown>): AdminAccountUi => ({
   email: String(item.email ?? ""),
   role: roleToUi(item.role),
   status: statusToUi(item.status),
-  phone: String(item.phone ?? item.phoneNumber ?? ""),
 });
 
 const mapProject = (item: Record<string, unknown>): AdminProjectUi => ({
@@ -162,9 +171,7 @@ const mapLabel = (item: Record<string, unknown>): AdminLabelUi => ({
   totalClasses: Array.isArray(item.classes)
     ? (item.classes as unknown[]).length
     : Number(item.totalClasses ?? 0),
-  classes: Array.isArray(item.classes)
-    ? (item.classes as string[])
-    : [],
+  classes: Array.isArray(item.classes) ? (item.classes as string[]) : [],
   createdAt: String(item.createdAt ?? new Date().toISOString().slice(0, 10)),
 });
 
@@ -180,7 +187,8 @@ const mapPreset = (item: Record<string, unknown>): AdminPresetUi => ({
   createdAt: String(item.createdAt ?? new Date().toISOString().slice(0, 10)),
 });
 
-export const hasBackendConfig = () => Boolean(import.meta.env.VITE_PUBLIC_BACKEND_URL);
+export const hasBackendConfig = () =>
+  Boolean(import.meta.env.VITE_PUBLIC_BACKEND_URL);
 
 // Unwrap backend envelope: { success, data: ... } or Axios response { data: { success, data: ... } }
 const unwrap = (value: unknown): unknown => {
@@ -188,7 +196,11 @@ const unwrap = (value: unknown): unknown => {
   const obj = value as Record<string, unknown>;
   // Axios response object has .data
   const inner = obj.data ?? obj;
-  if (inner && typeof inner === "object" && "success" in (inner as Record<string, unknown>)) {
+  if (
+    inner &&
+    typeof inner === "object" &&
+    "success" in (inner as Record<string, unknown>)
+  ) {
     return (inner as Record<string, unknown>).data;
   }
   return inner;
@@ -196,7 +208,10 @@ const unwrap = (value: unknown): unknown => {
 
 const unwrapRecord = (value: unknown): Record<string, unknown> => {
   const result = unwrap(value);
-  return (result && typeof result === "object" ? result : {}) as Record<string, unknown>;
+  return (result && typeof result === "object" ? result : {}) as Record<
+    string,
+    unknown
+  >;
 };
 
 export const fetchAdminAccounts = async (): Promise<AdminAccountUi[]> => {
@@ -257,15 +272,19 @@ export const updateAdminProject = async (
   id: string,
   payload: Partial<Omit<AdminProjectUi, "id" | "createdAt">>,
 ): Promise<AdminProjectUi> => {
-  const response = unwrapRecord(await updateProject(id, {
-    name: payload.name ?? "",
-    description: payload.description,
-    dataType: projectTypeToApi(payload.dataType ?? "Image"),
-  }));
+  const response = unwrapRecord(
+    await updateProject(id, {
+      name: payload.name ?? "",
+      description: payload.description,
+      dataType: projectTypeToApi(payload.dataType ?? "Image"),
+    }),
+  );
 
   return mapProject({
     ...response,
-    status: payload.status ? projectStatusToApi(payload.status) : response.status,
+    status: payload.status
+      ? projectStatusToApi(payload.status)
+      : response.status,
   });
 };
 
@@ -282,11 +301,13 @@ export const fetchAdminLabels = async (): Promise<AdminLabelUi[]> => {
 export const createAdminLabel = async (
   payload: Omit<AdminLabelUi, "id" | "createdAt" | "totalClasses">,
 ): Promise<AdminLabelUi> => {
-  const response = unwrapRecord(await createLabel({
-    name: payload.name,
-    description: payload.description,
-    categoryIds: [],
-  }));
+  const response = unwrapRecord(
+    await createLabel({
+      name: payload.name,
+      description: payload.description,
+      categoryIds: [],
+    }),
+  );
 
   return mapLabel({ ...response, classes: payload.classes ?? [] });
 };
@@ -295,10 +316,12 @@ export const updateAdminLabel = async (
   id: string,
   payload: Partial<Omit<AdminLabelUi, "id" | "createdAt">>,
 ): Promise<AdminLabelUi> => {
-  const response = unwrapRecord(await updateLabel(id, {
-    name: payload.name,
-    description: payload.description,
-  }));
+  const response = unwrapRecord(
+    await updateLabel(id, {
+      name: payload.name,
+      description: payload.description,
+    }),
+  );
 
   return mapLabel({ ...response, classes: payload.classes ?? [] });
 };
@@ -316,11 +339,13 @@ export const fetchAdminPresets = async (): Promise<AdminPresetUi[]> => {
 export const createAdminPreset = async (
   payload: Omit<AdminPresetUi, "id" | "createdAt">,
 ): Promise<AdminPresetUi> => {
-  const response = unwrapRecord(await createLabelPreset({
-    name: payload.name,
-    description: payload.description,
-    labelIds: payload.labels,
-  }));
+  const response = unwrapRecord(
+    await createLabelPreset({
+      name: payload.name,
+      description: payload.description,
+      labelIds: payload.labels,
+    }),
+  );
 
   return mapPreset(response);
 };
@@ -329,11 +354,13 @@ export const updateAdminPreset = async (
   id: string,
   payload: Partial<Omit<AdminPresetUi, "id" | "createdAt">>,
 ): Promise<AdminPresetUi> => {
-  const response = unwrapRecord(await updateLabelPreset(id, {
-    name: payload.name,
-    description: payload.description,
-    labelIds: payload.labels,
-  }));
+  const response = unwrapRecord(
+    await updateLabelPreset(id, {
+      name: payload.name,
+      description: payload.description,
+      labelIds: payload.labels,
+    }),
+  );
 
   return mapPreset(response);
 };
@@ -342,18 +369,19 @@ export const deleteAdminPreset = async (id: string): Promise<void> => {
   await deleteLabelPreset(id);
 };
 
-export const fetchAdminDashboardStats = async (): Promise<AdminDashboardStats> => {
-  const [accounts, projects, labels, presets] = await Promise.all([
-    fetchAdminAccounts(),
-    fetchAdminProjects(),
-    fetchAdminLabels(),
-    fetchAdminPresets(),
-  ]);
+export const fetchAdminDashboardStats =
+  async (): Promise<AdminDashboardStats> => {
+    const [accounts, projects, labels, presets] = await Promise.all([
+      fetchAdminAccounts(),
+      fetchAdminProjects(),
+      fetchAdminLabels(),
+      fetchAdminPresets(),
+    ]);
 
-  return {
-    totalUsers: accounts.length,
-    totalProjects: projects.length,
-    totalLabels: labels.length,
-    totalPresets: presets.length,
+    return {
+      totalUsers: accounts.length,
+      totalProjects: projects.length,
+      totalLabels: labels.length,
+      totalPresets: presets.length,
+    };
   };
-};

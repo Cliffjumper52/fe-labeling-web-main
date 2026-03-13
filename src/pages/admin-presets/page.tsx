@@ -4,6 +4,7 @@ import {
   deleteLabelPreset,
   getLabelPresetsPaginated,
 } from "../../services/label-preset-service.service";
+import { ConfirmButton } from "../../components/common/confirm-modal";
 
 type ApiEnvelope<T> = { data?: T; message?: string | string[] };
 type PaginatedPayload<T> = {
@@ -65,7 +66,6 @@ export default function AdminPresetsPage() {
   }, []);
 
   const onDelete = async (id: string) => {
-    if (!window.confirm("Delete this preset?")) return;
     try {
       await deleteLabelPreset(id);
       toast.success("Preset deleted");
@@ -140,13 +140,16 @@ export default function AdminPresetsPage() {
                 >
                   Detail
                 </button>
-                <button
-                  type="button"
-                  className="text-red-600 hover:text-red-700"
-                  onClick={() => void onDelete(item.id)}
-                >
-                  Delete
-                </button>
+                <ConfirmButton
+                  label="Delete"
+                  variant="danger"
+                  size="sm"
+                  className="!h-auto !border-0 !bg-transparent !p-0 text-red-600 hover:text-red-700 hover:!bg-transparent"
+                  modalHeader="Delete this preset?"
+                  modalBody={`Are you sure you want to delete ${item.name}? This action cannot be undone.`}
+                  confirmLabel="Delete"
+                  onConfirm={() => onDelete(item.id)}
+                />
               </div>
             </div>
           ))
