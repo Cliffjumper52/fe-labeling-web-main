@@ -49,6 +49,7 @@ export default function ReviewerQueuePage() {
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [acceptingTaskId, setAcceptingTaskId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<
     ProjectTask["status"] | "All"
@@ -143,6 +144,7 @@ export default function ReviewerQueuePage() {
   };
 
   const handleAcceptTask = async (taskId: string) => {
+    setAcceptingTaskId(taskId);
     try {
       await patchProjectTask(taskId, { status: ProjectTaskStatus.IN_PROGRESS });
       toast.success("Task accepted. You can now start reviewing.");
@@ -153,6 +155,8 @@ export default function ReviewerQueuePage() {
           ? err.message
           : "Failed to accept the task. Please try again.",
       );
+    } finally {
+      setAcceptingTaskId(null);
     }
   };
 
@@ -231,6 +235,7 @@ export default function ReviewerQueuePage() {
         isLoading={isLoading}
         error={error}
         onAccept={handleAcceptTask}
+        acceptingTaskId={acceptingTaskId}
       />
     </div>
   );

@@ -24,7 +24,7 @@ import {
 } from "./label-preset-service.service";
 
 type RoleUi = "Admin" | "Manager" | "Reviewer" | "Annotator";
-type StatusUi = "Active" | "Suspended";
+type StatusUi = "Active" | "Inactive" | "Need Change Password";
 
 type ProjectStatusUi = "Drafting" | "Active" | "Archived";
 type ProjectTypeUi = "Image" | "Video" | "Text" | "Audio";
@@ -116,11 +116,16 @@ const roleToApi = (role: RoleUi) =>
 
 const statusToUi = (status: unknown): StatusUi => {
   const normalized = String(status ?? "active").toLowerCase();
-  return normalized === "inactive" ? "Suspended" : "Active";
+  if (normalized === "inactive") return "Inactive";
+  if (normalized === "need_change_password") return "Need Change Password";
+  return "Active";
 };
 
-const statusToApi = (status: StatusUi) =>
-  (status === "Active" ? "active" : "inactive") as "active" | "inactive";
+const statusToApi = (status: StatusUi) => {
+  if (status === "Inactive") return "inactive" as const;
+  if (status === "Need Change Password") return "need_change_password" as const;
+  return "active" as const;
+};
 
 const projectStatusToUi = (status: unknown): ProjectStatusUi => {
   const normalized = String(status ?? "draft").toLowerCase();

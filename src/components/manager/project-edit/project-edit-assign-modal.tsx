@@ -18,6 +18,7 @@ type Props = {
   filesLoading: boolean;
   unassignedFiles: ApiFile[];
   onToggleFile: (fileId: string) => void;
+  isAssigning: boolean;
   onConfirm: () => void;
   onClose: () => void;
 };
@@ -37,6 +38,7 @@ export default function ProjectEditAssignModal({
   filesLoading,
   unassignedFiles,
   onToggleFile,
+  isAssigning,
   onConfirm,
   onClose,
 }: Props) {
@@ -51,7 +53,7 @@ export default function ProjectEditAssignModal({
   );
 
   const handleOverlayClick = (event: MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) {
+    if (!isAssigning && event.target === event.currentTarget) {
       onClose();
     }
   };
@@ -71,14 +73,15 @@ export default function ProjectEditAssignModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
             aria-label="Close"
+            disabled={isAssigning}
           >
             ✕
           </button>
         </div>
 
-        <div className="p-4">
+        <fieldset disabled={isAssigning} className="p-4">
           <input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
@@ -167,12 +170,23 @@ export default function ProjectEditAssignModal({
             <button
               type="button"
               onClick={onConfirm}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+              disabled={isAssigning}
+              className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Confirm assign
+              {isAssigning ? (
+                <>
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                    <path d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor" className="opacity-75" />
+                  </svg>
+                  Assigning...
+                </>
+              ) : (
+                "Confirm assign"
+              )}
             </button>
           </div>
-        </div>
+        </fieldset>
       </div>
     </div>,
     document.body,

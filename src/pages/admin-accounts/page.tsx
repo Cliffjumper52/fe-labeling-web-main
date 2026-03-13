@@ -19,7 +19,7 @@ type AdminUser = {
   name: string;
   email: string;
   role: "Admin" | "Manager" | "Reviewer" | "Annotator";
-  status: "Active" | "Suspended";
+  status: "Active" | "Inactive" | "Need Change Password";
 };
 
 export default function AdminAccountsPage() {
@@ -234,7 +234,8 @@ export default function AdminAccountsPage() {
           >
             <option>All</option>
             <option>Active</option>
-            <option>Suspended</option>
+            <option>Inactive</option>
+            <option>Need Change Password</option>
           </select>
         </div>
 
@@ -302,7 +303,9 @@ export default function AdminAccountsPage() {
                 className={`w-fit rounded-md px-3 py-1 text-xs font-semibold ${
                   user.status === "Active"
                     ? "bg-green-100 text-green-700"
-                    : "bg-amber-100 text-amber-700"
+                    : user.status === "Need Change Password"
+                      ? "bg-yellow-100 text-yellow-700"
+                      : "bg-red-100 text-red-700"
                 }`}
               >
                 {user.status}
@@ -542,7 +545,8 @@ export default function AdminAccountsPage() {
                   required
                 >
                   <option>Active</option>
-                  <option>Suspended</option>
+                  <option>Inactive</option>
+                  <option>Need Change Password</option>
                 </select>
               </div>
 

@@ -318,6 +318,8 @@ export default function ManagerProjectEditPage() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedUploadFiles, setSelectedUploadFiles] = useState<File[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
   const [projectFiles, setProjectFiles] = useState<ApiFile[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [unassignedAnnotatorFiles, setUnassignedAnnotatorFiles] = useState<
@@ -1020,6 +1022,7 @@ export default function ManagerProjectEditPage() {
       return;
     }
 
+    setIsAssigning(true);
     try {
       await createProjectTask({
         projectId: id,
@@ -1034,6 +1037,8 @@ export default function ManagerProjectEditPage() {
       closeModal(false);
     } catch (err) {
       toast.error(extractErrorMessage(err, "Failed to create assignment."));
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -1048,29 +1053,34 @@ export default function ManagerProjectEditPage() {
       return;
     }
 
-    if (selectedUploadFiles.length > 0) {
-      const uploadedNames = selectedUploadFiles.map((file) => file.name);
+    setIsUploading(true);
+    try {
+      if (selectedUploadFiles.length > 0) {
+        const uploadedNames = selectedUploadFiles.map((file) => file.name);
 
-      let uploadSucceeded = false;
-      try {
-        await Promise.all(
-          selectedUploadFiles.map((file) =>
-            createFile({ projectId: id }, file),
-          ),
-        );
-        await loadProjectFiles(id);
-        uploadSucceeded = true;
-        toast.success("Files uploaded successfully.");
-      } catch (err) {
-        toast.error(extractErrorMessage(err, "Failed to upload files."));
-      }
+        let uploadSucceeded = false;
+        try {
+          await Promise.all(
+            selectedUploadFiles.map((file) =>
+              createFile({ projectId: id }, file),
+            ),
+          );
+          await loadProjectFiles(id);
+          uploadSucceeded = true;
+          toast.success("Files uploaded successfully.");
+        } catch (err) {
+          toast.error(extractErrorMessage(err, "Failed to upload files."));
+        }
 
-      if (!uploadSucceeded) {
-        setUploadedFiles((prev) => [...prev, ...uploadedNames]);
+        if (!uploadSucceeded) {
+          setUploadedFiles((prev) => [...prev, ...uploadedNames]);
+        }
       }
+      setIsUploadOpen(false);
+      setSelectedUploadFiles([]);
+    } finally {
+      setIsUploading(false);
     }
-    setIsUploadOpen(false);
-    setSelectedUploadFiles([]);
   };
 
   const handleDeleteUploadedFile = async (fileName: string) => {
@@ -1545,6 +1555,7 @@ export default function ManagerProjectEditPage() {
         open={isUploadOpen}
         closing={Boolean(closingModals.upload)}
         selectedUploadFiles={selectedUploadFiles}
+        isUploading={isUploading}
         onClose={() => closeWithAnimation("upload", setIsUploadOpen)}
         onUploadFileChange={handleUploadFileChange}
         onConfirmUpload={() => void handleConfirmUpload()}
@@ -1567,6 +1578,7 @@ export default function ManagerProjectEditPage() {
         onToggleFile={(fileId) =>
           toggleSelection(fileId, setSelectedAnnotatorFiles)
         }
+        isAssigning={isAssigning}
         onConfirm={() =>
           void submitAssignment(
             "annotator",
@@ -1599,6 +1611,7 @@ export default function ManagerProjectEditPage() {
         onToggleFile={(fileId) =>
           toggleSelection(fileId, setSelectedReviewerFiles)
         }
+        isAssigning={isAssigning}
         onConfirm={() =>
           void submitAssignment(
             "reviewer",

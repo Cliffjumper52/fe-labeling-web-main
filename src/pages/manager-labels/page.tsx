@@ -356,28 +356,7 @@ export default function ManagerLabelsPage({
     return sorted;
   }, [labels, order, orderBy, search]);
 
-  let labelStats = useMemo(() => {
-    return labels.reduce(
-      (acc, label) => {
-        acc.total += 1;
-        const questions = label.questions ?? [];
-        if (questions.length > 0) {
-          acc.withQuestions += 1;
-        }
-        for (const question of questions) {
-          if (question.role === "Annotator") {
-            acc.annotator += 1;
-          } else {
-            acc.reviewer += 1;
-          }
-        }
-        return acc;
-      },
-      { total: 0, withQuestions: 0, annotator: 0, reviewer: 0 },
-    );
-  }, [labels]);
-
-  labelStats = useMemo(() => {
+  const labelStats = useMemo(() => {
     return labels.reduce(
       (acc, label) => {
         acc.total += 1;
@@ -886,187 +865,194 @@ export default function ManagerLabelsPage({
               />
             </div>
           </div>
-          ) : (
+
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-gray-700">
+              Order by
+            </label>
+            <select
+              title="Order by"
+              value={orderBy}
+              onChange={(event) =>
+                setOrderBy(event.target.value as "Name" | "Date created")
+              }
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+            >
+              <option value="Name">Name</option>
+              <option value="Date created">Date created</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-gray-700">
+              Order
+            </label>
+            <select
+              title="Sort order"
+              value={order}
+              onChange={(event) =>
+                setOrder(event.target.value as "Ascending" | "Descending")
+              }
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+            >
+              <option value="Ascending">Ascending</option>
+              <option value="Descending">Descending</option>
+            </select>
+          </div>
+        </div>
+
+        {labelsError && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {labelsError}
+          </div>
+        )}
+
+        {labelsLoading ? (
+          <div className="rounded-lg border border-gray-200 bg-white px-5 py-12 text-center text-sm text-gray-500">
+            Loading labels...
+          </div>
+        ) : !hasLabels ? (
+          <div className="rounded-lg bg-white py-16 text-center">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-8 w-8 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800">
+              No labels yet
+            </h3>
+            <p className="mt-2 text-sm text-gray-500">
+              {isAdmin
+                ? "No labels are available right now."
+                : "Create your first label configuration for upcoming projects"}
+            </p>
+            {!isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  resetCreateLabelForm();
+                  setIsCreateLabelOpen(true);
+                }}
+                className="mt-6 inline-flex items-center gap-2 rounded-md bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+              >
+                <span className="text-base leading-none">+</span>
+                Create label
+              </button>
+            )}
+          </div>
+        ) : (
           <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
             <div className="grid grid-cols-[1.4fr_2fr_1.2fr_1fr_1fr_1fr_0.9fr] items-center gap-2 border-b border-gray-200 px-5 py-4 text-xs font-semibold uppercase text-gray-600">
               <span>Label</span>
               <span>Description</span>
-              <span>Categories</span>
+              <span className="flex justify-start">Categories</span>
               <span>Checklist</span>
               <span>Created</span>
               <span>Updated</span>
               <span>Actions</span>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-gray-700">
-                Order by
-              </label>
-              <select
-                title="Order by"
-                value={orderBy}
-                onChange={(event) =>
-                  setOrderBy(event.target.value as "Name" | "Date created")
-                }
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+            {visibleLabels.map((label) => (
+              <div
+                key={label.id}
+                className="grid grid-cols-[1.4fr_2fr_1.2fr_1fr_1fr_1fr_0.9fr] items-center gap-2 border-b border-gray-100 px-5 py-4 text-sm last:border-b-0"
               >
-                <option value="Name">Name</option>
-                <option value="Date created">Date created</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-gray-700">
-                Order
-              </label>
-              <select
-                title="Sort order"
-                value={order}
-                onChange={(event) =>
-                  setOrder(event.target.value as "Ascending" | "Descending")
-                }
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
-              >
-                <option value="Ascending">Ascending</option>
-                <option value="Descending">Descending</option>
-              </select>
-            </div>
-          </div>
-          {labelsError && (
-            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {labelsError}
-            </div>
-          )}
-          {labelsLoading ? (
-            <div className="rounded-lg border border-gray-200 bg-white px-5 py-12 text-center text-sm text-gray-500">
-              Loading labels...
-            </div>
-          ) : !hasLabels ? (
-            <div className="rounded-lg bg-white py-16 text-center">
-              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-8 w-8 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-800">
-                No labels yet
-              </h3>
-              <p className="mt-2 text-sm text-gray-500">
-                {isAdmin
-                  ? "No labels are available right now."
-                  : "Create your first label configuration for upcoming projects"}
-              </p>
-              {!isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetCreateLabelForm();
-                    setIsCreateLabelOpen(true);
-                  }}
-                  className="mt-6 inline-flex items-center gap-2 rounded-md bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-                >
-                  <span className="text-base leading-none">+</span>
-                  Create label
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-              <div className="grid grid-cols-[1.4fr_2fr_1.2fr_1fr_1fr_1fr_0.9fr] items-center gap-2 border-b border-gray-200 px-5 py-4 text-xs font-semibold uppercase text-gray-600">
-                <span>Label</span>
-                <span>Description</span>
-                <span className="flex justify-start">Categories</span>
-                <span>Checklist</span>
-                <span>Created</span>
-                <span>Updated</span>
-                <span>Actions</span>
-              </div>
-
-              {visibleLabels.map((label) => (
-                <div
-                  key={label.id}
-                  className="grid grid-cols-[1.4fr_2fr_1.2fr_1fr_1fr_1fr_0.9fr] items-center gap-2 border-b border-gray-100 px-5 py-4 text-sm last:border-b-0"
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="flex h-6 w-6 items-center justify-center rounded-md border border-gray-200"
-                      style={{ backgroundColor: label.color ?? "#f3f4f6" }}
-                    >
-                      <span className="h-2.5 w-2.5 rounded-full bg-white/80" />
-                    </span>
-                    <p className="font-semibold text-gray-900">{label.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">
-                      {truncateText(label.description || "No description", 20)}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex w-full flex-col items-start gap-2">
-                      {(label.categories ?? []).length === 0 ? (
-                        <span className="text-xs text-gray-400">
-                          No category
-                        </span>
-                      ) : (
-                        (label.categories ?? []).map((category) => (
-                          <span
-                            key={category.id}
-                            className="w-[90px] rounded-full bg-gray-100 px-3 py-1 text-center text-xs font-semibold text-gray-700"
-                          >
-                            {category.name}
-                          </span>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex flex-wrap gap-2">
-                      {(label.questions ?? []).filter(
-                        (question) => question.role === "Annotator",
-                      ).length > 0 && (
-                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                          {
-                            (label.questions ?? []).filter(
-                              (question) => question.role === "Annotator",
-                            ).length
-                          }{" "}
-                          Annotator
-                        </span>
-                      )}
-                      {(label.questions ?? []).filter(
-                        (question) => question.role === "Reviewer",
-                      ).length > 0 && (
-                        <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-700">
-                          {
-                            (label.questions ?? []).filter(
-                              (question) => question.role === "Reviewer",
-                            ).length
-                          }{" "}
-                          Reviewer
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <span className="text-sm text-gray-600">
-                    {label.createdAt}
+                <div className="flex items-center gap-3">
+                  <span
+                    className="flex h-6 w-6 items-center justify-center rounded-md border border-gray-200"
+                    style={{ backgroundColor: label.color ?? "#f3f4f6" }}
+                  >
+                    <span className="h-2.5 w-2.5 rounded-full bg-white/80" />
                   </span>
-                  <span className="text-sm text-gray-600">
-                    {label.updatedAt}
-                  </span>
-                  <div className="flex items-center gap-3 text-sm font-semibold">
-                    <Link
-                      to={`/manager/labels/${label.id}`}
-                      className="text-blue-600 hover:text-blue-700"
+                  <p className="font-semibold text-gray-900">{label.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">
+                    {truncateText(label.description || "No description", 20)}
+                  </p>
+                </div>
+                <div>
+                  <div className="flex w-full flex-col items-start gap-2">
+                    {(label.categories ?? []).length === 0 ? (
+                      <span className="text-xs text-gray-400">
+                        No category
+                      </span>
+                    ) : (
+                      (label.categories ?? []).map((category) => (
+                        <span
+                          key={category.id}
+                          className="w-[90px] rounded-full bg-gray-100 px-3 py-1 text-center text-xs font-semibold text-gray-700"
+                        >
+                          {category.name}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="flex flex-wrap gap-2">
+                    {(label.questions ?? []).filter(
+                      (question) => question.role === "Annotator",
+                    ).length > 0 && (
+                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                        {
+                          (label.questions ?? []).filter(
+                            (question) => question.role === "Annotator",
+                          ).length
+                        }{" "}
+                        Annotator
+                      </span>
+                    )}
+                    {(label.questions ?? []).filter(
+                      (question) => question.role === "Reviewer",
+                    ).length > 0 && (
+                      <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-700">
+                        {
+                          (label.questions ?? []).filter(
+                            (question) => question.role === "Reviewer",
+                          ).length
+                        }{" "}
+                        Reviewer
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span className="text-sm text-gray-600">
+                  {label.createdAt}
+                </span>
+                <span className="text-sm text-gray-600">
+                  {label.updatedAt}
+                </span>
+                <div className="flex items-center gap-3 text-sm font-semibold">
+                  <Link
+                    to={`/manager/labels/${label.id}`}
+                    className="text-blue-600 hover:text-blue-700"
+                  >
+                    Details
+                  </Link>
+                  {isAdmin ? (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteLabel(label.id)}
+                      className="text-red-500 hover:text-red-600"
                     >
-                      Details
-                    </Link>
-                    {isAdmin ? (
+                      Delete
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenLabelEdit(label)}
+                        className="text-blue-600 hover:text-blue-700"
+                      >
+                        Edit
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleDeleteLabel(label.id)}
@@ -1074,46 +1060,30 @@ export default function ManagerLabelsPage({
                       >
                         Delete
                       </button>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenLabelEdit(label)}
-                          className="text-blue-600 hover:text-blue-700"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteLabel(label.id)}
-                          className="text-red-500 hover:text-red-600"
-                        >
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </div>
+                    </>
+                  )}
                 </div>
-              ))}
+              </div>
+            ))}
 
-              {visibleLabels.length === 0 && (
-                <div className="px-5 py-12 text-center text-sm text-gray-500">
-                  No labels found for current filters.
-                </div>
-              )}
-            </div>
-          )}
-          {hasLabels && !labelsLoading && totalPages > 1 && (
-            <div className="flex justify-center">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={(page) => setCurrentPage(page)}
-                size="md"
-              />
-            </div>
-          )}
-        </div>
+            {visibleLabels.length === 0 && (
+              <div className="px-5 py-12 text-center text-sm text-gray-500">
+                No labels found for current filters.
+              </div>
+            )}
+          </div>
+        )}
+
+        {hasLabels && !labelsLoading && totalPages > 1 && (
+          <div className="flex justify-center">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => setCurrentPage(page)}
+              size="md"
+            />
+          </div>
+        )}
 
         {isCreateLabelOpen && (
           <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 px-4 py-6 sm:items-center">

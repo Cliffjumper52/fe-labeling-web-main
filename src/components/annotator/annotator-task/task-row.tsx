@@ -55,9 +55,10 @@ const formatDate = (value: string | null): string => {
 type Props = {
   task: ProjectTask;
   onAccept: (taskId: string) => void;
+  acceptingTaskId: string | null;
 };
 
-export default function TaskRow({ task, onAccept }: Props) {
+export default function TaskRow({ task, onAccept, acceptingTaskId }: Props) {
   return (
     <div className="grid grid-cols-[1.4fr_1fr_0.9fr_1fr_1.2fr] items-center gap-2 border-b px-4 py-3 text-sm last:border-b-0">
       <div>
@@ -112,7 +113,23 @@ export default function TaskRow({ task, onAccept }: Props) {
 
       <div className="flex flex-wrap items-center gap-3 text-sm font-semibold">
         {task.status === ProjectTaskStatus.ASSIGNED ? (
-          <button onClick={() => onAccept(task.id)}>Accept Task</button>
+          <button
+            onClick={() => onAccept(task.id)}
+            disabled={acceptingTaskId !== null}
+            className="flex items-center gap-2 rounded-md bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {acceptingTaskId === task.id ? (
+              <>
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                  <path d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor" className="opacity-75" />
+                </svg>
+                Accepting...
+              </>
+            ) : (
+              "Accept Task"
+            )}
+          </button>
         ) : (
           <Link
             to={`/annotator/workspace/${task.id}`}
