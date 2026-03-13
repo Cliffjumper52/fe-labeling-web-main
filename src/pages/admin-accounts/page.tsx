@@ -5,6 +5,14 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
+import { toast } from "sonner";
+import {
+  createAdminAccount,
+  deleteAdminAccount,
+  fetchAdminAccounts,
+  updateAdminAccount,
+} from "../../services/admin-service";
+import { ConfirmButton } from "../../components/common/confirm-modal";
 
 type AdminUser = {
   id: string;
@@ -12,104 +20,79 @@ type AdminUser = {
   email: string;
   role: "Admin" | "Manager" | "Reviewer" | "Annotator";
   status: "Active" | "Suspended";
-  phone: string;
-};
-
-const initialUsers: AdminUser[] = [
-  {
-    id: "user-1",
-    name: "Alex Morgan",
-    email: "alex.morgan@example.com",
-    role: "Manager",
-    status: "Active",
-    phone: "+1 415 555 0182",
-  },
-  {
-    id: "user-2",
-    name: "Riley Chen",
-    email: "riley.chen@example.com",
-    role: "Annotator",
-    status: "Active",
-    phone: "+1 646 555 0119",
-  },
-  {
-    id: "user-3",
-    name: "Jordan Patel",
-    email: "jordan.patel@example.com",
-    role: "Reviewer",
-    status: "Suspended",
-    phone: "+1 212 555 0196",
-  },
-];
-
-const ADMIN_USERS_STORAGE_KEY = "admin-users";
-const ADMIN_USERS_UPDATED_EVENT = "admin-users-updated";
-
-const readUsersFromStorage = (): AdminUser[] => {
-  if (typeof window === "undefined") {
-    return initialUsers;
-  }
-  const raw = localStorage.getItem(ADMIN_USERS_STORAGE_KEY);
-  if (!raw) {
-    return initialUsers;
-  }
-  try {
-    const parsed = JSON.parse(raw) as AdminUser[];
-    return parsed.length > 0 ? parsed : initialUsers;
-  } catch {
-    return initialUsers;
-  }
 };
 
 export default function AdminAccountsPage() {
-  const [users, setUsers] = useState<AdminUser[]>(() => readUsersFromStorage());
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const hasUsers = users.length > 0;
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [newUserName, setNewUserName] = useState("");
   const [newUserEmail, setNewUserEmail] = useState("");
-  const [newUserRole, setNewUserRole] = useState<AdminUser["role"]>(
-    "Annotator",
-  );
-  const [newUserPhone, setNewUserPhone] = useState("");
+  const [newUserRole, setNewUserRole] =
+    useState<AdminUser["role"]>("Annotator");
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editUserName, setEditUserName] = useState("");
   const [editUserEmail, setEditUserEmail] = useState("");
-  const [editUserRole, setEditUserRole] = useState<AdminUser["role"]>(
-    "Annotator",
-  );
-  const [editUserStatus, setEditUserStatus] = useState<AdminUser["status"]>(
-    "Active",
-  );
-  const [editUserPhone, setEditUserPhone] = useState("");
+  const [editUserRole, setEditUserRole] =
+    useState<AdminUser["role"]>("Annotator");
+  const [editUserStatus, setEditUserStatus] =
+    useState<AdminUser["status"]>("Active");
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
 
-  const handleCreateUser = (event: FormEvent) => {
+  const handleCreateUser = async (event: FormEvent) => {
     event.preventDefault();
-    setUsers((prev) => [
-      {
-        id: crypto.randomUUID(),
+
+    try {
+      const created = await createAdminAccount({
         name: newUserName.trim() || "Unnamed User",
         email: newUserEmail.trim(),
         role: newUserRole,
         status: "Active",
-        phone: newUserPhone.trim(),
-      },
-      ...prev,
-    ]);
+      });
+      setUsers((prev) => [created as AdminUser, ...prev]);
+      toast.success("User created successfully.");
+    } catch {
+      toast.error("Create user failed.");
+      return;
+    }
+
     setIsCreateUserOpen(false);
     setNewUserName("");
     setNewUserEmail("");
     setNewUserRole("Annotator");
-    setNewUserPhone("");
   };
 
   useEffect(() => {
-    localStorage.setItem(ADMIN_USERS_STORAGE_KEY, JSON.stringify(users));
-    window.dispatchEvent(new CustomEvent(ADMIN_USERS_UPDATED_EVENT));
-  }, [users]);
+    let mounted = true;
+    setIsLoading(true);
+
+    const loadUsers = async () => {
+      try {
+        const remoteUsers = await fetchAdminAccounts();
+        if (mounted && remoteUsers.length > 0) {
+          setUsers(remoteUsers as AdminUser[]);
+        }
+      } catch {
+        if (mounted) {
+          toast.error("Failed to load accounts from API.");
+        }
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadUsers();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const closeWithAnimation = (
     key: string,
@@ -126,8 +109,14 @@ export default function AdminAccountsPage() {
     }, 200);
   };
 
-  const handleDeleteUser = (userId: string) => {
-    setUsers((prev) => prev.filter((user) => user.id !== userId));
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      await deleteAdminAccount(userId);
+      setUsers((prev) => prev.filter((user) => user.id !== userId));
+      toast.success("User deleted.");
+    } catch {
+      toast.error("Delete user failed.");
+    }
   };
 
   const resetEditForm = () => {
@@ -136,7 +125,6 @@ export default function AdminAccountsPage() {
     setEditUserEmail("");
     setEditUserRole("Annotator");
     setEditUserStatus("Active");
-    setEditUserPhone("");
   };
 
   const handleOpenEdit = (user: AdminUser) => {
@@ -145,29 +133,38 @@ export default function AdminAccountsPage() {
     setEditUserEmail(user.email);
     setEditUserRole(user.role);
     setEditUserStatus(user.status);
-    setEditUserPhone(user.phone);
     setIsEditUserOpen(true);
   };
 
-  const handleUpdateUser = (event: FormEvent) => {
+  const handleUpdateUser = async (event: FormEvent) => {
     event.preventDefault();
     if (!editingUserId) {
       return;
     }
-    setUsers((prev) =>
-      prev.map((user) =>
-        user.id === editingUserId
-          ? {
-              ...user,
-              name: editUserName.trim() || "Unnamed User",
-              email: editUserEmail.trim(),
-              role: editUserRole,
-              status: editUserStatus,
-              phone: editUserPhone.trim(),
-            }
-          : user,
-      ),
-    );
+
+    const updatedPayload = {
+      name: editUserName.trim() || "Unnamed User",
+      email: editUserEmail.trim(),
+      role: editUserRole,
+      status: editUserStatus,
+    };
+
+    try {
+      const remoteUpdated = await updateAdminAccount(
+        editingUserId,
+        updatedPayload,
+      );
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === editingUserId ? (remoteUpdated as AdminUser) : user,
+        ),
+      );
+      toast.success("User updated.");
+    } catch {
+      toast.error("Update user failed.");
+      return;
+    }
+
     setIsEditUserOpen(false);
     resetEditForm();
   };
@@ -187,6 +184,12 @@ export default function AdminAccountsPage() {
       </div>
 
       <div className="mb-4 h-px w-full bg-gray-200" />
+
+      {isLoading && (
+        <div className="mb-4 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+          Loading accounts from API...
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <div className="flex flex-col gap-1">
@@ -211,7 +214,10 @@ export default function AdminAccountsPage() {
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Role</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <select
+            title="Filter by role"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>All</option>
             <option>Admin</option>
             <option>Manager</option>
@@ -222,7 +228,10 @@ export default function AdminAccountsPage() {
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-700">Status</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <select
+            title="Filter by status"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>All</option>
             <option>Active</option>
             <option>Suspended</option>
@@ -230,8 +239,13 @@ export default function AdminAccountsPage() {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-gray-700">Order by</label>
-          <select className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm">
+          <label className="text-xs font-semibold text-gray-700">
+            Order by
+          </label>
+          <select
+            title="Order users"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+          >
             <option>Name</option>
             <option>Date created</option>
             <option>Updated</option>
@@ -294,7 +308,10 @@ export default function AdminAccountsPage() {
                 {user.status}
               </span>
               <div className="flex items-center gap-3 text-sm font-semibold">
-                <button type="button" className="text-blue-600 hover:text-blue-700">
+                <button
+                  type="button"
+                  className="text-blue-600 hover:text-blue-700"
+                >
                   Details
                 </button>
                 <button
@@ -304,13 +321,16 @@ export default function AdminAccountsPage() {
                 >
                   Edit
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteUser(user.id)}
-                  className="text-red-500 hover:text-red-600"
-                >
-                  Delete
-                </button>
+                <ConfirmButton
+                  label="Delete"
+                  variant="danger"
+                  size="sm"
+                  className="!h-auto !border-0 !bg-transparent !p-0 text-red-500 hover:text-red-600 hover:!bg-transparent"
+                  modalHeader="Delete this account?"
+                  modalBody={`Are you sure you want to delete ${user.name}? This action cannot be undone.`}
+                  confirmLabel="Delete"
+                  onConfirm={() => handleDeleteUser(user.id)}
+                />
               </div>
             </div>
           ))}
@@ -325,10 +345,14 @@ export default function AdminAccountsPage() {
             }`}
           >
             <div className="flex items-center justify-between border-b px-4 py-3">
-              <h3 className="text-sm font-semibold text-gray-800">Create new user</h3>
+              <h3 className="text-sm font-semibold text-gray-800">
+                Create new user
+              </h3>
               <button
                 type="button"
-                onClick={() => closeWithAnimation("createUser", setIsCreateUserOpen)}
+                onClick={() =>
+                  closeWithAnimation("createUser", setIsCreateUserOpen)
+                }
                 className="text-gray-500 hover:text-gray-700"
                 aria-label="Close"
               >
@@ -345,7 +369,10 @@ export default function AdminAccountsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateUser} className="flex flex-col gap-4 p-4">
+            <form
+              onSubmit={handleCreateUser}
+              className="flex flex-col gap-4 p-4"
+            >
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-gray-700">
                   User name
@@ -360,7 +387,9 @@ export default function AdminAccountsPage() {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">Gmail</label>
+                <label className="text-xs font-semibold text-gray-700">
+                  Gmail
+                </label>
                 <input
                   type="email"
                   value={newUserEmail}
@@ -374,12 +403,15 @@ export default function AdminAccountsPage() {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">Roles</label>
+                <label className="text-xs font-semibold text-gray-700">
+                  Roles
+                </label>
                 <select
                   value={newUserRole}
                   onChange={(event) =>
                     setNewUserRole(event.target.value as AdminUser["role"])
                   }
+                  title="New user role"
                   className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                   required
                 >
@@ -390,26 +422,12 @@ export default function AdminAccountsPage() {
                 </select>
               </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">
-                  Phone number
-                </label>
-                <input
-                  type="tel"
-                  value={newUserPhone}
-                  onChange={(event) => setNewUserPhone(event.target.value)}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="+1 555 000 1234"
-                  pattern="^\+?[0-9\s-]{8,15}$"
-                  title="Use 8-15 digits; spaces, dashes, and optional leading + are allowed"
-                  required
-                />
-              </div>
-
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => closeWithAnimation("createUser", setIsCreateUserOpen)}
+                  onClick={() =>
+                    closeWithAnimation("createUser", setIsCreateUserOpen)
+                  }
                   className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
@@ -457,7 +475,10 @@ export default function AdminAccountsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleUpdateUser} className="flex flex-col gap-4 p-4">
+            <form
+              onSubmit={handleUpdateUser}
+              className="flex flex-col gap-4 p-4"
+            >
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-gray-700">
                   User name
@@ -472,7 +493,9 @@ export default function AdminAccountsPage() {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">Gmail</label>
+                <label className="text-xs font-semibold text-gray-700">
+                  Gmail
+                </label>
                 <input
                   type="email"
                   value={editUserEmail}
@@ -486,12 +509,15 @@ export default function AdminAccountsPage() {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">Roles</label>
+                <label className="text-xs font-semibold text-gray-700">
+                  Roles
+                </label>
                 <select
                   value={editUserRole}
                   onChange={(event) =>
                     setEditUserRole(event.target.value as AdminUser["role"])
                   }
+                  title="Edit user role"
                   className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                   required
                 >
@@ -503,34 +529,21 @@ export default function AdminAccountsPage() {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">Status</label>
+                <label className="text-xs font-semibold text-gray-700">
+                  Status
+                </label>
                 <select
                   value={editUserStatus}
                   onChange={(event) =>
                     setEditUserStatus(event.target.value as AdminUser["status"])
                   }
+                  title="Edit user status"
                   className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                   required
                 >
                   <option>Active</option>
                   <option>Suspended</option>
                 </select>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-700">
-                  Phone number
-                </label>
-                <input
-                  type="tel"
-                  value={editUserPhone}
-                  onChange={(event) => setEditUserPhone(event.target.value)}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="+1 555 000 1234"
-                  pattern="^\+?[0-9\s-]{8,15}$"
-                  title="Use 8-15 digits; spaces, dashes, and optional leading + are allowed"
-                  required
-                />
               </div>
 
               <div className="flex items-center justify-end gap-2">

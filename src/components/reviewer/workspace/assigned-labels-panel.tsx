@@ -1,5 +1,5 @@
-import type { File as ProjectFile } from "../../../../interface/file/file.interface";
-import type { FileLabel } from "../../../../interface/file-label/file-label.interface";
+import type { File as ProjectFile } from "../../../interface/file/file.interface";
+import type { FileLabel } from "../../../interface/file-label/file-label.interface";
 
 type Props = {
   selectedFile: ProjectFile | null;

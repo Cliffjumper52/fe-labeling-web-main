@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import type { ApiResponse } from "../../interface/common/api-response.interface";
 import type { Review } from "../../interface/review/review.interface";
-import { Decision } from "../../interface/review/enums/decisions.enums";
+import type { Decision } from "../../interface/enums/domain.enums";
 import {
   getReviewerAggregationStats,
   getReviewsPaginated,
@@ -11,31 +11,32 @@ import {
 import Pagination from "../../components/common/pagination";
 import { useAuth } from "../../context/auth-context.context";
 
-const PAGE_LIMIT = 20;
+const PAGE_LIMIT = 10;
 
 interface PaginatedReviewPayload {
   data?: Review[];
-  items?: Review[];
-  meta?: { totalPages?: number; pageCount?: number };
+  totalPages?: number;
+  currentPage?: number;
+  limit?: number;
+  hasNext?: boolean;
+  hasPrev?: boolean;
 }
 
 const extractReviews = (
   payload: unknown,
 ): { reviews: Review[]; totalPages: number } => {
-  const outer = payload as { data?: PaginatedReviewPayload } | undefined;
+  const outer = payload as ApiResponse<PaginatedReviewPayload> | undefined;
   const inner = outer?.data;
   const reviews: Review[] = Array.isArray(inner?.data)
-    ? (inner!.data as Review[])
-    : Array.isArray(inner?.items)
-      ? (inner!.items as Review[])
-      : [];
-  const totalPages = inner?.meta?.totalPages ?? inner?.meta?.pageCount ?? 1;
+    ? (inner.data as Review[])
+    : [];
+  const totalPages = inner?.totalPages ?? 1;
   return { reviews, totalPages };
 };
 
 const decisionBadge = (decision: Decision): string => {
-  if (decision === Decision.APPROVED) return "bg-emerald-100 text-emerald-700";
-  if (decision === Decision.REJECTED) return "bg-rose-100 text-rose-700";
+  if (decision === "approved") return "bg-emerald-100 text-emerald-700";
+  if (decision === "rejected") return "bg-rose-100 text-rose-700";
   return "bg-amber-100 text-amber-700";
 };
 
@@ -112,9 +113,6 @@ export default function Page() {
       return null;
     }
   });
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const [reviewerIdInput, setReviewerIdInput] = useState(currentUser?.id ?? "");
   const [stats, setStats] = useState<ReviewerAggregationStats>(EMPTY_STATS);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,10 +125,6 @@ export default function Page() {
   const [reviewSearch, setReviewSearch] = useState("");
   const [decisionFilter, setDecisionFilter] = useState<Decision | "All">("All");
   const [orderBy, setOrderBy] = useState("reviewedAt");
-
-  useEffect(() => {
-    setReviewerIdInput(currentUser?.id ?? "");
-  }, [currentUser]);
 
   useEffect(() => {
     let cancelled = false;
@@ -240,20 +234,6 @@ export default function Page() {
     };
   }, [currentUser?.id, page, decisionFilter, reviewSearch, orderBy]);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const nextReviewerId = reviewerIdInput.trim();
-    const nextParams = new URLSearchParams(searchParams);
-
-    if (!nextReviewerId) {
-      nextParams.delete("reviewerId");
-    } else {
-      nextParams.set("reviewerId", nextReviewerId);
-    }
-
-    setSearchParams(nextParams);
-  };
-
   return (
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-5">
@@ -321,9 +301,9 @@ export default function Page() {
             className="rounded-md border border-gray-300 px-3 py-2 text-sm"
           >
             <option value="All">All</option>
-            <option value={Decision.APPROVED}>Approved</option>
-            <option value={Decision.REJECTED}>Rejected</option>
-            <option value={Decision.PENDING}>Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="pending">Pending</option>
           </select>
         </div>
         <div className="flex flex-col gap-1">
@@ -349,11 +329,12 @@ export default function Page() {
       <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <div className="min-w-[640px]">
-            <div className="grid grid-cols-[1.8fr_0.8fr_1.8fr_0.9fr] items-center gap-2 border-b bg-gray-50 px-4 py-3 text-xs font-semibold uppercase text-gray-600">
+            <div className="grid grid-cols-[1.8fr_0.8fr_1.8fr_0.9fr_0.8fr] items-center gap-2 border-b bg-gray-50 px-4 py-3 text-xs font-semibold uppercase text-gray-600">
               <span>File Label</span>
               <span>Decision</span>
               <span>Feedbacks</span>
               <span>Reviewed At</span>
+              <span>Action</span>
             </div>
 
             {reviewsLoading && (
@@ -379,7 +360,7 @@ export default function Page() {
               reviews.map((review) => (
                 <div
                   key={review.id}
-                  className="grid grid-cols-[1.8fr_0.8fr_1.8fr_0.9fr] items-center gap-2 border-b px-4 py-3 text-sm last:border-b-0"
+                  className="grid grid-cols-[1.8fr_0.8fr_1.8fr_0.9fr_0.8fr] items-center gap-2 border-b px-4 py-3 text-sm last:border-b-0"
                 >
                   <div>
                     <p className="truncate font-medium text-gray-800">
@@ -400,6 +381,12 @@ export default function Page() {
                   <p className="text-xs text-gray-500">
                     {formatDate(review.reviewedAt)}
                   </p>
+                  <Link
+                    to={`/reviewer/reviews/${review.id}`}
+                    className="inline-flex w-fit items-center rounded-md border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                  >
+                    View detail
+                  </Link>
                 </div>
               ))}
           </div>

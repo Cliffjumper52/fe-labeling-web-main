@@ -20,7 +20,7 @@ export default function LoginForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(email, password);
+    onLogin(email.trim(), password);
   };
 
   return (

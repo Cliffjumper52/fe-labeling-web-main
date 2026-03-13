@@ -1,28 +1,47 @@
-import type { Project } from "../../../../interface/project/project.interface";
-import type { ProjectTask } from "../../../../interface/project-task/project-task.interface";
-import type { ProjectInstruction } from "../../../../interface/project-instruction/project-instruction.interface";
+import type { Label } from "../../../interface/label/label.interface";
+import type { Project } from "../../../interface/project/project.interface";
+import type { ProjectInstruction } from "../../../interface/project-instruction/project-instruction.interface";
+import type { ProjectTask } from "../../../interface/project-task/project-task.interface";
 
 type Props = {
   project: Project | null;
   taskById: ProjectTask | null;
+  taskId: string | undefined;
+  taskStatusText: string;
   projectInstruction: ProjectInstruction | null;
   instructionItems: string[];
-  allowedLabelNames: string[];
+  projectLabels: Label[];
   metaError: string | null;
 };
 
 export default function TaskDetailsPanel({
   project,
   taskById,
+  taskId,
+  taskStatusText,
   projectInstruction,
   instructionItems,
-  allowedLabelNames,
+  projectLabels,
   metaError,
 }: Props) {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <p className="text-xs font-semibold text-gray-500">Project overview</p>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800">
+              Reviewer Workspace: {project?.name ?? "Project Workspace"}
+            </h2>
+            <p className="text-sm text-gray-500">
+              Task {taskById?.id ?? taskId ?? "--"}
+            </p>
+          </div>
+          <span className="rounded-md bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+            {taskStatusText}
+          </span>
+        </div>
+
+        <p className="text-xs font-semibold text-gray-500">Task details</p>
         {project?.imageUrl ? (
           <img
             src={project.imageUrl}
@@ -38,21 +57,9 @@ export default function TaskDetailsPanel({
             </span>
           </div>
           <div className="flex items-start justify-between gap-3">
-            <span className="text-gray-500">Project ID</span>
-            <span className="text-right font-semibold text-gray-800">
-              {project?.id ?? taskById?.projectId ?? "--"}
-            </span>
-          </div>
-          <div className="flex items-start justify-between gap-3">
-            <span className="text-gray-500">Status</span>
+            <span className="text-gray-500">Priority</span>
             <span className="text-right font-semibold capitalize text-gray-800">
-              {project?.projectStatus ?? "--"}
-            </span>
-          </div>
-          <div className="flex items-start justify-between gap-3">
-            <span className="text-gray-500">Data type</span>
-            <span className="text-right font-semibold capitalize text-gray-800">
-              {project?.dataType ?? "--"}
+              {taskById?.priority ?? "--"}
             </span>
           </div>
           <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
@@ -97,13 +104,13 @@ export default function TaskDetailsPanel({
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <p className="text-xs font-semibold text-gray-500">Allowed labels</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {allowedLabelNames.length > 0 ? (
-            allowedLabelNames.map((label) => (
+          {projectLabels.length > 0 ? (
+            projectLabels.map((label) => (
               <span
-                key={label}
+                key={label.id}
                 className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
               >
-                {label}
+                {label.name}
               </span>
             ))
           ) : (

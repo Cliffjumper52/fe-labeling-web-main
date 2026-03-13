@@ -18,16 +18,18 @@ import {
   getAllFileLabels,
 } from "../../services/file-label-service.service";
 import { getAllFiles } from "../../services/file-service.service";
+import { FileStatus } from "../../interface/file/enums/file-status.enums";
+import { updateFile } from "../../services/file-service.service";
 import { getAllLabelChecklistQuestions } from "../../services/label-checklist-question-service.service";
 import { getAllowedLabelsInProject } from "../../services/label-service.service";
 import { getProjectInstructionByProjectId } from "../../services/project-instruction-service.service";
 import { getProjectTaskById } from "../../services/project-task-service.service";
-import TaskDetailsPanel from "../../components/roles/annotator/workspace/TaskDetailsPanel";
-import CanvasPreviewPanel from "../../components/roles/annotator/workspace/CanvasPreviewPanel";
-import AssignedLabelsPanel from "../../components/roles/annotator/workspace/AssignedLabelsPanel";
+import TaskDetailsPanel from "../../components/annotator/workspace/task-details-panel";
+import CanvasPreviewPanel from "../../components/annotator/workspace/canvas-preview-panel";
+import AssignedLabelsPanel from "../../components/annotator/workspace/assigned-label-panel";
 import WorkflowModal, {
   type WorkflowModalMode,
-} from "../../components/roles/annotator/workspace/WorkflowModal";
+} from "../../components/annotator/workspace/workflow-modal";
 
 const extractApiData = <T,>(payload: unknown): T | null => {
   const apiResponse = payload as ApiResponse<T>;
@@ -343,6 +345,24 @@ export default function AnnotatorWorkspacePage() {
 
     return selectedFile.contentType.startsWith("image/");
   }, [selectedFile]);
+
+  const canSubmitChecklistByFileStatus = useMemo(() => {
+    if (!selectedFile?.status) {
+      return false;
+    }
+
+    return (
+      selectedFile.status === "in_annotation" ||
+      selectedFile.status === "requires_fix"
+    );
+  }, [selectedFile?.status]);
+
+  const canSubmitFileForReview = useMemo(
+    () =>
+      selectedFile?.status === "in_annotation" ||
+      selectedFile?.status === "requires_fix",
+    [selectedFile?.status],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -693,6 +713,36 @@ export default function AnnotatorWorkspacePage() {
     }
   };
 
+  const [submittingFileForReview, setSubmittingFileForReview] = useState(false);
+  const [submitFileForReviewError, setSubmitFileForReviewError] = useState<
+    string | null
+  >(null);
+
+  const handleSubmitFileForReview = async () => {
+    if (!selectedFile?.id || !canSubmitFileForReview) {
+      return;
+    }
+
+    setSubmittingFileForReview(true);
+    setSubmitFileForReviewError(null);
+
+    try {
+      await updateFile(selectedFile.id, { status: FileStatus.PENDING_REVIEW });
+      await refreshAssignedFiles(
+        selectedFile.id,
+        "Failed to refresh files after submitting for review.",
+      );
+    } catch (error) {
+      setSubmitFileForReviewError(
+        error instanceof Error
+          ? error.message
+          : "Failed to submit file for review.",
+      );
+    } finally {
+      setSubmittingFileForReview(false);
+    }
+  };
+
   const handleSubmitChecklist = async () => {
     if (!selectedFile?.id || !workflowLabelId) {
       return;
@@ -787,6 +837,7 @@ export default function AnnotatorWorkspacePage() {
           projectInstruction={projectInstruction}
           instructionItems={instructionItems}
           allowedLabelNames={allowedLabelNames}
+          selectedFile={selectedFile}
           metaError={metaError}
         />
 
@@ -809,6 +860,9 @@ export default function AnnotatorWorkspacePage() {
           filteredLabels={filteredLabels}
           selectedLabel={selectedLabel}
           canAddSelectedLabel={canAddSelectedLabel}
+          canSubmitFileForReview={canSubmitFileForReview}
+          submittingFileForReview={submittingFileForReview}
+          submitFileForReviewError={submitFileForReviewError}
           isSelectedLabelAssigned={isSelectedLabelAssigned}
           mapFileLabelStatusToBadge={mapFileLabelStatusToBadge}
           mapFileLabelStatusToText={mapFileLabelStatusToText}
@@ -819,6 +873,9 @@ export default function AnnotatorWorkspacePage() {
           onLabelSearchChange={setLabelSearch}
           onSelectLabel={setSelectedLabel}
           onAddLabel={handleAddLabel}
+          onSubmitFileForReview={() => {
+            void handleSubmitFileForReview();
+          }}
         />
       </div>
 
@@ -847,6 +904,8 @@ export default function AnnotatorWorkspacePage() {
           onQuestionNoteChange={handleQuestionNoteChange}
           onSubmissionNotesChange={handleWorkflowSubmissionNotesChange}
           onSubmitChecklist={handleSubmitChecklist}
+          canSubmitForSelectedFile={canSubmitChecklistByFileStatus}
+          selectedFileStatus={selectedFile?.status ?? null}
         />
       ) : null}
     </div>

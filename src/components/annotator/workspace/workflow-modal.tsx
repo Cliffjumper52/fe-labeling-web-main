@@ -1,6 +1,7 @@
-import type { ChecklistAnswer } from "../../../../interface/checklist-answer/checklist-answer.interface";
-import type { FileLabel } from "../../../../interface/file-label/file-label.interface";
-import type { LabelChecklistQuestion } from "../../../../interface/label-checklist-question/label-checklist-question.interface";
+import type { ChecklistAnswer } from "../../../interface/checklist-answer/checklist-answer.interface";
+import type { FileLabel } from "../../../interface/file-label/file-label.interface";
+import type { LabelChecklistQuestion } from "../../../interface/label-checklist-question/label-checklist-question.interface";
+import { ConfirmButton } from "../../common/confirm-modal";
 
 export type WorkflowModalMode = "assign" | "resubmit" | "view";
 
@@ -8,6 +9,8 @@ type Props = {
   mode: WorkflowModalMode;
   labelName: string;
   fileLabel: FileLabel | null;
+  canSubmitForSelectedFile: boolean;
+  selectedFileStatus: string | null;
   checklistQuestions: LabelChecklistQuestion[];
   loadingChecklistQuestions: boolean;
   checklistQuestionsError: string | null;
@@ -34,6 +37,8 @@ export default function WorkflowModal({
   mode,
   labelName,
   fileLabel,
+  canSubmitForSelectedFile,
+  selectedFileStatus,
   checklistQuestions,
   loadingChecklistQuestions,
   checklistQuestionsError,
@@ -56,6 +61,18 @@ export default function WorkflowModal({
   onSubmitChecklist,
 }: Props) {
   const isChecklistMode = mode === "assign" || mode === "resubmit";
+  const selectedFileStatusText = selectedFileStatus
+    ? selectedFileStatus.replaceAll("_", " ")
+    : "unknown";
+  const disableChecklistSubmit =
+    submittingChecklist ||
+    loadingChecklistQuestions ||
+    Boolean(checklistQuestionsError) ||
+    checklistQuestions.length === 0 ||
+    hasMissingRequiredChecklist ||
+    !canSubmitForSelectedFile;
+  const checklistSubmitLabel =
+    mode === "resubmit" ? "Resubmit Checklist" : "Submit Checklist";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
@@ -102,7 +119,20 @@ export default function WorkflowModal({
                   <span className="font-semibold text-rose-600">*</span> marks
                   required questions.
                 </p>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  File status:{" "}
+                  <span className="font-semibold">
+                    {selectedFileStatusText}
+                  </span>
+                </p>
               </div>
+
+              {!canSubmitForSelectedFile ? (
+                <p className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-700">
+                  Submission is available only when file status is in annotation
+                  or requires fix.
+                </p>
+              ) : null}
 
               {hasMissingRequiredChecklist && requiredCount > 0 ? (
                 <p className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-700">
@@ -338,24 +368,25 @@ export default function WorkflowModal({
           </button>
 
           {isChecklistMode ? (
-            <button
-              type="button"
-              onClick={onSubmitChecklist}
-              disabled={
-                submittingChecklist ||
-                loadingChecklistQuestions ||
-                Boolean(checklistQuestionsError) ||
-                checklistQuestions.length === 0 ||
-                hasMissingRequiredChecklist
+            <ConfirmButton
+              label={
+                submittingChecklist ? "Submitting..." : checklistSubmitLabel
               }
-              className="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
-            >
-              {submittingChecklist
-                ? "Submitting..."
-                : mode === "resubmit"
-                  ? "Resubmit Checklist"
-                  : "Submit Checklist"}
-            </button>
+              variant="primary"
+              size="sm"
+              className="!rounded-md"
+              disabled={disableChecklistSubmit}
+              modalHeader={
+                mode === "resubmit"
+                  ? "Resubmit this checklist?"
+                  : "Submit this checklist?"
+              }
+              modalBody={`Confirm ${
+                mode === "resubmit" ? "resubmission" : "submission"
+              } for label "${labelName}". This action moves the label workflow forward.`}
+              confirmLabel={mode === "resubmit" ? "Resubmit" : "Submit"}
+              onConfirm={onSubmitChecklist}
+            />
           ) : null}
         </div>
       </div>

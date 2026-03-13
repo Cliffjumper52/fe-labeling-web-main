@@ -1,4 +1,5 @@
 import type { ContentType } from "../enums/domain.enums";
+import type { FileStatus } from "./enums/file-status.enums";
 import type {
   BaseEntityModel,
   EntityReference,
@@ -11,6 +12,7 @@ export interface File extends BaseEntityModel {
   fileSize: number;
   contentType: ContentType;
   fileUrl: string;
+  status: FileStatus;
   uploadedById: string;
   uploadedBy?: EntityReference;
   annotatorId: string | null;

@@ -73,6 +73,12 @@ export const router: RouterItem[] = [
         path: "presets",
         Component: React.lazy(() => import("../pages/admin-presets/page")),
       },
+      {
+        path: "label-categories",
+        Component: React.lazy(
+          () => import("../pages/admin-label-categories/page"),
+        ),
+      },
     ],
   },
   {
@@ -120,11 +126,15 @@ export const router: RouterItem[] = [
       () => import("../components/common/layout/simple-layout"),
     ),
     path: "/reviewer",
-    Component: React.lazy(() => import("../pages/reviewer-queue/page")),
+    Component: React.lazy(() => import("../pages/reviewer-home/page")),
     sidebar: React.lazy(
       () => import("../components/common/sidebar/reviewer-sidebar"),
     ),
     children: [
+      {
+        path: "queue",
+        Component: React.lazy(() => import("../pages/reviewer-queue/page")),
+      },
       {
         path: "workspace/:id",
         Component: React.lazy(() => import("../pages/reviewer-workspace/page")),
@@ -132,6 +142,12 @@ export const router: RouterItem[] = [
       {
         path: "reviews",
         Component: React.lazy(() => import("../pages/reviewer-reports/page")),
+      },
+      {
+        path: "reviews/:id",
+        Component: React.lazy(
+          () => import("../pages/reviewer-review-detail/page"),
+        ),
       },
       {
         path: "review-error-types",

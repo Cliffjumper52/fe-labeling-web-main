@@ -35,9 +35,8 @@ export default function LoginPage() {
       } else if (role === "reviewer") {
         navigate("/reviewer");
       }
-    } catch (error) {
-      console.log(error);
-      toast.error("Login failed");
+    } catch {
+      toast.error("Login failed. Check email/password or backend status.");
     } finally {
       setIsLoading(false);
     }

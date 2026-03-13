@@ -1,5 +1,6 @@
-import type { File as ProjectFile } from "../../../../interface/file/file.interface";
-import type { FileLabel } from "../../../../interface/file-label/file-label.interface";
+import type { File as ProjectFile } from "../../../interface/file/file.interface";
+import type { FileLabel } from "../../../interface/file-label/file-label.interface";
+import { ConfirmButton } from "../../common/confirm-modal";
 
 export type AssignedLabelsWorkflowMode = "assign" | "resubmit" | "view";
 
@@ -14,6 +15,9 @@ type Props = {
   filteredLabels: string[];
   selectedLabel: string | null;
   canAddSelectedLabel: boolean;
+  canSubmitFileForReview: boolean;
+  submittingFileForReview: boolean;
+  submitFileForReviewError: string | null;
   isSelectedLabelAssigned: boolean;
   mapFileLabelStatusToBadge: (status: FileLabel["status"]) => string;
   mapFileLabelStatusToText: (status: FileLabel["status"]) => string;
@@ -27,6 +31,7 @@ type Props = {
   onLabelSearchChange: (value: string) => void;
   onSelectLabel: (label: string) => void;
   onAddLabel: () => void;
+  onSubmitFileForReview: () => void;
 };
 
 export default function AssignedLabelsPanel({
@@ -40,6 +45,9 @@ export default function AssignedLabelsPanel({
   filteredLabels,
   selectedLabel,
   canAddSelectedLabel,
+  canSubmitFileForReview,
+  submittingFileForReview,
+  submitFileForReviewError,
   isSelectedLabelAssigned,
   mapFileLabelStatusToBadge,
   mapFileLabelStatusToText,
@@ -48,6 +56,7 @@ export default function AssignedLabelsPanel({
   onLabelSearchChange,
   onSelectLabel,
   onAddLabel,
+  onSubmitFileForReview,
 }: Props) {
   return (
     <div className="space-y-4 lg:max-h-[calc(100vh-150px)] lg:overflow-y-auto lg:pr-1">
@@ -215,10 +224,45 @@ export default function AssignedLabelsPanel({
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <p className="text-xs text-gray-500">
-          Checklist and review history are shown in modal for selected label
-          actions.
+        <p className="text-xs font-semibold text-gray-500">Submit for review</p>
+        <p className="mt-1 text-[11px] text-gray-500">
+          Once submitted, labels cannot be changed until the reviewer returns
+          the file.
         </p>
+
+        {selectedFile?.status ? (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-[11px] text-gray-500">File status:</span>
+            <span className="rounded bg-gray-100 px-2 py-[2px] text-[11px] font-semibold capitalize text-gray-700">
+              {selectedFile.status.replaceAll("_", " ")}
+            </span>
+          </div>
+        ) : null}
+
+        {submitFileForReviewError ? (
+          <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700">
+            {submitFileForReviewError}
+          </p>
+        ) : null}
+
+        <ConfirmButton
+          label={
+            submittingFileForReview ? "Submitting..." : "Submit file for review"
+          }
+          variant="success"
+          className="mt-3 !w-full !justify-center"
+          disabled={!canSubmitFileForReview || submittingFileForReview}
+          modalHeader="Submit file for review?"
+          modalBody={`Submit "${selectedFile?.fileName || selectedFile?.id || "this file"}" for review? Once submitted, labels cannot be changed until the reviewer returns the file.`}
+          confirmLabel="Submit"
+          onConfirm={onSubmitFileForReview}
+        />
+
+        {!canSubmitFileForReview && selectedFile ? (
+          <p className="mt-1 text-[11px] text-gray-500">
+            Available when file status is in annotation or requires fix.
+          </p>
+        ) : null}
       </div>
     </div>
   );
