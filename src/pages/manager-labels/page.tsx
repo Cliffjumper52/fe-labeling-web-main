@@ -886,63 +886,48 @@ export default function ManagerLabelsPage({
               />
             </div>
           </div>
-          ) : (
-          <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-            <div className="grid grid-cols-[1.4fr_2fr_1.2fr_1fr_1fr_1fr_0.9fr] items-center gap-2 border-b border-gray-200 px-5 py-4 text-xs font-semibold uppercase text-gray-600">
-              <span>Label</span>
-              <span>Description</span>
-              <span>Categories</span>
-              <span>Checklist</span>
-              <span>Created</span>
-              <span>Updated</span>
-              <span>Actions</span>
-            </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-gray-700">
+              Order by
+            </label>
+            <select
+              title="Order by"
+              value={orderBy}
+              onChange={(event) =>
+                setOrderBy(event.target.value as "Name" | "Date created")
+              }
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+            >
+              <option value="Name">Name</option>
+              <option value="Date created">Date created</option>
+            </select>
+          </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-gray-700">
-                Order by
-              </label>
-              <select
-                title="Order by"
-                value={orderBy}
-                onChange={(event) =>
-                  setOrderBy(event.target.value as "Name" | "Date created")
-                }
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
-              >
-                <option value="Name">Name</option>
-                <option value="Date created">Date created</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-gray-700">
-                Order
-              </label>
-              <select
-                title="Sort order"
-                value={order}
-                onChange={(event) =>
-                  setOrder(event.target.value as "Ascending" | "Descending")
-                }
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
-              >
-                <option value="Ascending">Ascending</option>
-                <option value="Descending">Descending</option>
-              </select>
-            </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-gray-700">Order</label>
+            <select
+              title="Sort order"
+              value={order}
+              onChange={(event) =>
+                setOrder(event.target.value as "Ascending" | "Descending")
+              }
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+            >
+              <option value="Ascending">Ascending</option>
+              <option value="Descending">Descending</option>
+            </select>
           </div>
           {labelsError && (
-            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 lg:col-span-3">
               {labelsError}
             </div>
           )}
           {labelsLoading ? (
-            <div className="rounded-lg border border-gray-200 bg-white px-5 py-12 text-center text-sm text-gray-500">
+            <div className="rounded-lg border border-gray-200 bg-white px-5 py-12 text-center text-sm text-gray-500 lg:col-span-3">
               Loading labels...
             </div>
           ) : !hasLabels ? (
-            <div className="rounded-lg bg-white py-16 text-center">
+            <div className="rounded-lg bg-white py-16 text-center lg:col-span-3">
               <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
                 <svg
                   viewBox="0 0 24 24"
@@ -977,7 +962,7 @@ export default function ManagerLabelsPage({
               )}
             </div>
           ) : (
-            <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div className="rounded-lg border border-gray-200 bg-white shadow-sm lg:col-span-3">
               <div className="grid grid-cols-[1.4fr_2fr_1.2fr_1fr_1fr_1fr_0.9fr] items-center gap-2 border-b border-gray-200 px-5 py-4 text-xs font-semibold uppercase text-gray-600">
                 <span>Label</span>
                 <span>Description</span>
@@ -1104,7 +1089,7 @@ export default function ManagerLabelsPage({
             </div>
           )}
           {hasLabels && !labelsLoading && totalPages > 1 && (
-            <div className="flex justify-center">
+            <div className="flex justify-center lg:col-span-3">
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
