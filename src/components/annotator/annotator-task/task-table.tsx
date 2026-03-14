@@ -6,6 +6,7 @@ type Props = {
   isLoading: boolean;
   error: string | null;
   onAccept: (taskId: string) => void;
+  acceptingTaskId: string | null;
 };
 
 export default function TaskTable({
@@ -13,6 +14,7 @@ export default function TaskTable({
   isLoading,
   error,
   onAccept,
+  acceptingTaskId,
 }: Props) {
   return (
     <div className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -41,7 +43,7 @@ export default function TaskTable({
       {!isLoading &&
         !error &&
         tasks.map((task) => (
-          <TaskRow key={task.id} task={task} onAccept={onAccept} />
+          <TaskRow key={task.id} task={task} onAccept={onAccept} acceptingTaskId={acceptingTaskId} />
         ))}
     </div>
   );

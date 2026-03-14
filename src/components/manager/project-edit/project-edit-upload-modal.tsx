@@ -6,6 +6,7 @@ type Props = {
   open: boolean;
   closing: boolean;
   selectedUploadFiles: File[];
+  isUploading: boolean;
   onClose: () => void;
   onUploadFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onConfirmUpload: () => void;
@@ -15,6 +16,7 @@ export default function ProjectEditUploadModal({
   open,
   closing,
   selectedUploadFiles,
+  isUploading,
   onClose,
   onUploadFileChange,
   onConfirmUpload,
@@ -26,7 +28,7 @@ export default function ProjectEditUploadModal({
   }
 
   const handleOverlayClick = (event: MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) {
+    if (!isUploading && event.target === event.currentTarget) {
       onClose();
     }
   };
@@ -48,14 +50,15 @@ export default function ProjectEditUploadModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
             aria-label="Close"
+            disabled={isUploading}
           >
             ✕
           </button>
         </div>
 
-        <div className="p-4">
+        <fieldset disabled={isUploading} className="p-4">
           <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 px-4 py-6 text-center">
             <Upload className="h-8 w-8 text-gray-400" />
             <p className="mt-3 text-sm font-semibold text-gray-700">
@@ -87,12 +90,23 @@ export default function ProjectEditUploadModal({
             <button
               type="button"
               onClick={onConfirmUpload}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+              disabled={isUploading}
+              className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Confirm upload
+              {isUploading ? (
+                <>
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                    <path d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor" className="opacity-75" />
+                  </svg>
+                  Uploading...
+                </>
+              ) : (
+                "Confirm upload"
+              )}
             </button>
           </div>
-        </div>
+        </fieldset>
       </div>
     </div>,
     document.body,
