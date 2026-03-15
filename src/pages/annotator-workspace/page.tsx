@@ -103,6 +103,13 @@ const mapFileLabelStatusToText = (status: FileLabel["status"]): string => {
   return status.replaceAll("_", " ");
 };
 
+const filterActionableAnnotatorFiles = (files: ProjectFile[]): ProjectFile[] =>
+  files.filter(
+    (file) =>
+      file.status === FileStatus.IN_ANNOTATION ||
+      file.status === FileStatus.REQUIRES_FIX,
+  );
+
 const isChecklistAnswerSnapshot = (
   item: EntityReference | ChecklistAnswer,
 ): item is ChecklistAnswer => {
@@ -422,7 +429,9 @@ export default function AnnotatorWorkspacePage() {
         }
 
         if (filesResult.status === "fulfilled") {
-          const files = extractArrayApiData<ProjectFile>(filesResult.value);
+          const files = filterActionableAnnotatorFiles(
+            extractArrayApiData<ProjectFile>(filesResult.value),
+          );
           setAssignedFiles(files);
           setSelectedFile(files[0] ?? null);
         } else {
@@ -677,7 +686,9 @@ export default function AnnotatorWorkspacePage() {
         projectId: taskById.projectId,
         annotatorId: currentUser.id,
       });
-      const refreshedFiles = extractArrayApiData<ProjectFile>(filesResp);
+      const refreshedFiles = filterActionableAnnotatorFiles(
+        extractArrayApiData<ProjectFile>(filesResp),
+      );
       setAssignedFiles(refreshedFiles);
       setSelectedFile((previous) => {
         const selectedId = previous?.id ?? fallbackSelectedFileId;

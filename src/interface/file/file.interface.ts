@@ -5,6 +5,11 @@ import type {
   EntityReference,
 } from "../common/base-entity.interface";
 
+export interface AccountReference extends EntityReference {
+  username: string;
+  email?: string;
+}
+
 export interface File extends BaseEntityModel {
   projectId: string;
   project?: EntityReference;
@@ -16,8 +21,8 @@ export interface File extends BaseEntityModel {
   uploadedById: string;
   uploadedBy?: EntityReference;
   annotatorId: string | null;
-  annotator?: EntityReference | null;
+  annotator?: AccountReference | null;
   reviewerId: string | null;
-  reviewer?: EntityReference | null;
+  reviewer?: AccountReference | null;
   fileLabels?: EntityReference[];
 }

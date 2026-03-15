@@ -398,9 +398,8 @@ export default function AdminAccountsPage() {
                   value={newUserEmail}
                   onChange={(event) => setNewUserEmail(event.target.value)}
                   className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="name@gmail.com"
-                  pattern="^[^@\s]+@gmail\.com$"
-                  title="Enter a valid Gmail address (name@gmail.com)"
+                  placeholder="name@email.com"
+                  title="Enter a valid Email Accounts"
                   required
                 />
               </div>

@@ -43,11 +43,13 @@ import {
   getFilesPaginated,
   getUnassignedFiles,
   deleteFile,
+  updateFile,
 } from "../../services/file-service.service";
 import { getAllLabels } from "../../services/label-service.service";
 import { getAllAccounts } from "../../services/account-service.service";
 import {
   createProjectTask,
+  deleteProjectTask,
   getManagerProjectTasks,
 } from "../../services/project-task-service.service";
 import type { ProjectTask } from "../../interface/project-task/project-task.interface";
@@ -401,6 +403,14 @@ export default function ManagerProjectEditPage() {
   const snapshotExportPollingRef = useRef<number | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [deletingFileName, setDeletingFileName] = useState<string | null>(null);
+  const [changingFileAssigneeKey, setChangingFileAssigneeKey] = useState<
+    string | null
+  >(null);
+  const [unassigningMemberId, setUnassigningMemberId] = useState<string | null>(
+    null,
+  );
+  const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
   const [annotators, setAnnotators] = useState<TeamMember[]>([]);
   const [reviewers, setReviewers] = useState<TeamMember[]>([]);
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
@@ -428,6 +438,36 @@ export default function ManagerProjectEditPage() {
     }
     return Array.from(ids);
   }, [reviewerFileAssignments, selectedReviewerId]);
+
+  const annotatorTaskAssigneeIds = useMemo(() => {
+    return Array.from(
+      new Set(
+        projectTasks
+          .filter(
+            (task) =>
+              task.assignedUserRole === "annotator" &&
+              typeof task.assignedTo === "string" &&
+              task.assignedTo.trim().length > 0,
+          )
+          .map((task) => task.assignedTo),
+      ),
+    );
+  }, [projectTasks]);
+
+  const reviewerTaskAssigneeIds = useMemo(() => {
+    return Array.from(
+      new Set(
+        projectTasks
+          .filter(
+            (task) =>
+              task.assignedUserRole === "reviewer" &&
+              typeof task.assignedTo === "string" &&
+              task.assignedTo.trim().length > 0,
+          )
+          .map((task) => task.assignedTo),
+      ),
+    );
+  }, [projectTasks]);
 
   const selectedPresets = useMemo(() => {
     if (selectedPresetIds.length === 0) {
@@ -585,6 +625,7 @@ export default function ManagerProjectEditPage() {
         limit: 200,
       });
       const tasks = extractArray<ProjectTask>(response);
+      setProjectTasks(tasks);
       setAnnotatorFileAssignments(
         buildAssignmentsFromTasks(tasks, "annotator"),
       );
@@ -983,21 +1024,32 @@ export default function ManagerProjectEditPage() {
     });
   };
 
-  const handleClearAssignedMember = (
+  const handleClearAssignedMember = async (
     role: "annotator" | "reviewer",
-    id: string,
+    memberId: string,
   ) => {
-    if (role === "annotator") {
-      removeMemberAssignments(id, setAnnotatorFileAssignments);
-      if (selectedAnnotatorId === id) {
-        setSelectedAnnotatorId(null);
-      }
-      return;
-    }
+    const tasksToDelete = projectTasks.filter(
+      (task) => task.assignedTo === memberId && task.assignedUserRole === role,
+    );
 
-    removeMemberAssignments(id, setReviewerFileAssignments);
-    if (selectedReviewerId === id) {
-      setSelectedReviewerId(null);
+    setUnassigningMemberId(memberId);
+    try {
+      await Promise.all(
+        tasksToDelete.map((task) => deleteProjectTask(task.id)),
+      );
+      if (id) {
+        await loadAssignmentsFromTasks(id);
+      }
+      if (role === "annotator" && selectedAnnotatorId === memberId) {
+        setSelectedAnnotatorId(null);
+      } else if (role === "reviewer" && selectedReviewerId === memberId) {
+        setSelectedReviewerId(null);
+      }
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Failed to unassign member."));
+      throw err;
+    } finally {
+      setUnassigningMemberId(null);
     }
   };
 
@@ -1093,12 +1145,46 @@ export default function ManagerProjectEditPage() {
       toast.error("Unable to find file id for deletion.");
       return;
     }
+    setDeletingFileName(fileName);
     try {
       await deleteFile(idByName);
       await loadProjectFiles(id);
       toast.success("File deleted.");
     } catch (err) {
       toast.error(extractErrorMessage(err, "Failed to delete file."));
+      throw err;
+    } finally {
+      setDeletingFileName(null);
+    }
+  };
+
+  const handleChangeFileAssignee = async (
+    fileId: string,
+    role: "annotator" | "reviewer",
+    assigneeId: string,
+  ) => {
+    if (!id) {
+      toast.error("Missing project id.");
+      return;
+    }
+
+    const key = `${fileId}:${role}`;
+    setChangingFileAssigneeKey(key);
+    try {
+      if (role === "annotator") {
+        await updateFile(fileId, { annotatorId: assigneeId });
+      } else {
+        await updateFile(fileId, { reviewerId: assigneeId });
+      }
+      await loadProjectFiles(id);
+      toast.success(
+        `${role === "annotator" ? "Annotator" : "Reviewer"} updated.`,
+      );
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Failed to update assignee."));
+      throw err;
+    } finally {
+      setChangingFileAssigneeKey(null);
     }
   };
 
@@ -1387,19 +1473,13 @@ export default function ManagerProjectEditPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      "Delete this project? This action cannot be undone.",
-    );
-    if (!confirmed) {
-      return;
-    }
-
     try {
       await deleteProject(id);
       toast.success("Project deleted.");
       navigate("/manager/projects");
     } catch (err) {
       toast.error(extractErrorMessage(err, "Failed to delete project."));
+      throw err;
     }
   };
 
@@ -1501,6 +1581,8 @@ export default function ManagerProjectEditPage() {
             projectFiles={projectFiles}
             assignedAnnotatorIds={assignedAnnotatorIds}
             assignedReviewerIds={assignedReviewerIds}
+            annotatorTaskAssigneeIds={annotatorTaskAssigneeIds}
+            reviewerTaskAssigneeIds={reviewerTaskAssigneeIds}
             configuredLabels={configuredLabels}
             annotatorFileAssignments={annotatorFileAssignments}
             reviewerFileAssignments={reviewerFileAssignments}
@@ -1530,7 +1612,13 @@ export default function ManagerProjectEditPage() {
               setIsSelectPresetOpen(true);
             }}
             onDeleteUploadedFile={handleDeleteUploadedFile}
-            onClearAssignedMember={handleClearAssignedMember}
+            deletingFileName={deletingFileName}
+            changingFileAssigneeKey={changingFileAssigneeKey}
+            onChangeFileAssignee={handleChangeFileAssignee}
+            onClearAssignedMember={(role, memberId) =>
+              void handleClearAssignedMember(role, memberId)
+            }
+            unassigningMemberId={unassigningMemberId}
             onRemoveConfiguredLabel={handleRemoveConfiguredLabel}
             onSaveLabelConfiguration={() =>
               void saveProjectConfigurationChanges()
@@ -1538,7 +1626,7 @@ export default function ManagerProjectEditPage() {
             onGuidelineTitleChange={setGuidelineTitle}
             onGuidelineFileChange={handleGuidelineFileChange}
             onSaveGuideline={() => void handleSaveGuideline()}
-            onDeleteProject={() => void handleDeleteProject()}
+            onDeleteProject={handleDeleteProject}
             onCancel={() => navigate("/manager/projects")}
             onCompleteProject={() => void handleCompleteProject()}
             isReadyToComplete={isReadyToComplete}

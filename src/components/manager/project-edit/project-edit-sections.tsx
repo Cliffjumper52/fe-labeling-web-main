@@ -1,4 +1,4 @@
-import { useRef, type ChangeEvent, type ReactNode } from "react";
+import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import {
   FileText,
   ListChecks,
@@ -20,6 +20,8 @@ type Props = {
   projectFiles: ApiFile[];
   assignedAnnotatorIds: string[];
   assignedReviewerIds: string[];
+  annotatorTaskAssigneeIds: string[];
+  reviewerTaskAssigneeIds: string[];
   configuredLabels: ManagerProjectEditAvailableLabel[];
   annotatorFileAssignments: Record<string, string[]>;
   reviewerFileAssignments: Record<string, string[]>;
@@ -36,14 +38,25 @@ type Props = {
   onOpenAssignAnnotators: () => void;
   onOpenAssignReviewers: () => void;
   onOpenLabelConfig: () => void;
-  onDeleteUploadedFile: (fileName: string) => void;
-  onClearAssignedMember: (role: "annotator" | "reviewer", id: string) => void;
+  deletingFileName: string | null;
+  changingFileAssigneeKey: string | null;
+  unassigningMemberId: string | null;
+  onDeleteUploadedFile: (fileName: string) => void | Promise<void>;
+  onChangeFileAssignee: (
+    fileId: string,
+    role: "annotator" | "reviewer",
+    assigneeId: string,
+  ) => void | Promise<void>;
+  onClearAssignedMember: (
+    role: "annotator" | "reviewer",
+    id: string,
+  ) => void | Promise<void>;
   onRemoveConfiguredLabel: (labelId: string) => void;
   onSaveLabelConfiguration: () => void;
   onGuidelineTitleChange: (value: string) => void;
   onGuidelineFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onSaveGuideline: () => void;
-  onDeleteProject: () => void;
+  onDeleteProject: () => void | Promise<void>;
   onCancel: () => void;
   onCompleteProject: () => void;
   isReadyToComplete: boolean;
@@ -83,9 +96,9 @@ export default function ProjectEditSections({
   projectFiles,
   assignedAnnotatorIds,
   assignedReviewerIds,
+  annotatorTaskAssigneeIds,
+  reviewerTaskAssigneeIds,
   configuredLabels,
-  annotatorFileAssignments,
-  reviewerFileAssignments,
   annotators,
   reviewers,
   guidelineTitle,
@@ -99,7 +112,11 @@ export default function ProjectEditSections({
   onOpenAssignAnnotators,
   onOpenAssignReviewers,
   onOpenLabelConfig,
+  deletingFileName,
+  changingFileAssigneeKey,
+  unassigningMemberId,
   onDeleteUploadedFile,
+  onChangeFileAssignee,
   onClearAssignedMember,
   onRemoveConfiguredLabel,
   onSaveLabelConfiguration,
@@ -107,16 +124,78 @@ export default function ProjectEditSections({
   onGuidelineFileChange,
   onSaveGuideline,
   onDeleteProject,
-  onCancel,
   onCompleteProject,
   isReadyToComplete,
   isProjectCompleted,
   completingProject,
   resolveMemberName,
-  resolveFileName,
-  resolveNames,
 }: Props) {
   const guidelineInputRef = useRef<HTMLInputElement>(null);
+  const [editingAnnotatorFileId, setEditingAnnotatorFileId] = useState<
+    string | null
+  >(null);
+  const [editingReviewerFileId, setEditingReviewerFileId] = useState<
+    string | null
+  >(null);
+  const [pendingAnnotatorSelection, setPendingAnnotatorSelection] = useState<
+    Record<string, string>
+  >({});
+  const [pendingReviewerSelection, setPendingReviewerSelection] = useState<
+    Record<string, string>
+  >({});
+
+  const getChangeKey = (fileId: string, role: "annotator" | "reviewer") =>
+    `${fileId}:${role}`;
+
+  const openAnnotatorEditor = (file: ApiFile) => {
+    if (annotatorTaskAssigneeIds.length === 0) {
+      return;
+    }
+    const fallback = annotatorTaskAssigneeIds[0];
+    const selected =
+      file.annotatorId && annotatorTaskAssigneeIds.includes(file.annotatorId)
+        ? file.annotatorId
+        : fallback;
+    setPendingAnnotatorSelection((prev) => ({
+      ...prev,
+      [file.id]: selected,
+    }));
+    setEditingAnnotatorFileId(file.id);
+  };
+
+  const openReviewerEditor = (file: ApiFile) => {
+    if (reviewerTaskAssigneeIds.length === 0) {
+      return;
+    }
+    const fallback = reviewerTaskAssigneeIds[0];
+    const selected =
+      file.reviewerId && reviewerTaskAssigneeIds.includes(file.reviewerId)
+        ? file.reviewerId
+        : fallback;
+    setPendingReviewerSelection((prev) => ({
+      ...prev,
+      [file.id]: selected,
+    }));
+    setEditingReviewerFileId(file.id);
+  };
+
+  const handleApplyAssigneeChange = async (
+    fileId: string,
+    role: "annotator" | "reviewer",
+    assigneeId: string | undefined,
+  ) => {
+    if (!assigneeId) {
+      return;
+    }
+
+    await onChangeFileAssignee(fileId, role, assigneeId);
+
+    if (role === "annotator") {
+      setEditingAnnotatorFileId(null);
+    } else {
+      setEditingReviewerFileId(null);
+    }
+  };
 
   const sections: Section[] = [
     {
@@ -244,16 +323,165 @@ export default function ProjectEditSections({
                           >
                             {file.status?.replaceAll("_", " ") ?? "unknown"}
                           </span>
+                          <div className="flex items-center justify-between gap-2 text-[10px] text-gray-400">
+                            <p className="min-w-0 truncate">
+                              <span className="font-medium text-gray-500">
+                                A:
+                              </span>{" "}
+                              {file.annotator?.username ?? (
+                                <span className="italic text-gray-300">
+                                  Unassigned
+                                </span>
+                              )}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => openAnnotatorEditor(file)}
+                              disabled={
+                                isProjectCompleted ||
+                                annotatorTaskAssigneeIds.length === 0 ||
+                                changingFileAssigneeKey !== null
+                              }
+                              className="rounded border border-gray-300 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Change
+                            </button>
+                          </div>
+                          {editingAnnotatorFileId === file.id && (
+                            <div className="flex items-center gap-1 text-[10px]">
+                              <select
+                                value={pendingAnnotatorSelection[file.id] ?? ""}
+                                onChange={(event) =>
+                                  setPendingAnnotatorSelection((prev) => ({
+                                    ...prev,
+                                    [file.id]: event.target.value,
+                                  }))
+                                }
+                                className="min-w-0 flex-1 rounded border border-gray-300 px-1 py-0.5 text-[10px]"
+                              >
+                                {annotatorTaskAssigneeIds.map((memberId) => (
+                                  <option key={memberId} value={memberId}>
+                                    {resolveMemberName(annotators, memberId)}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void handleApplyAssigneeChange(
+                                    file.id,
+                                    "annotator",
+                                    pendingAnnotatorSelection[file.id],
+                                  )
+                                }
+                                disabled={
+                                  changingFileAssigneeKey !== null ||
+                                  !pendingAnnotatorSelection[file.id]
+                                }
+                                className="rounded bg-blue-600 px-1.5 py-0.5 font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {changingFileAssigneeKey ===
+                                getChangeKey(file.id, "annotator")
+                                  ? "..."
+                                  : "Apply"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingAnnotatorFileId(null)}
+                                disabled={changingFileAssigneeKey !== null}
+                                className="rounded border border-gray-300 px-1.5 py-0.5 text-gray-600 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between gap-2 text-[10px] text-gray-400">
+                            <p className="min-w-0 truncate">
+                              <span className="font-medium text-gray-500">
+                                R:
+                              </span>{" "}
+                              {file.reviewer?.username ?? (
+                                <span className="italic text-gray-300">
+                                  Unassigned
+                                </span>
+                              )}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => openReviewerEditor(file)}
+                              disabled={
+                                isProjectCompleted ||
+                                reviewerTaskAssigneeIds.length === 0 ||
+                                changingFileAssigneeKey !== null
+                              }
+                              className="rounded border border-gray-300 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Change
+                            </button>
+                          </div>
+                          {editingReviewerFileId === file.id && (
+                            <div className="flex items-center gap-1 text-[10px]">
+                              <select
+                                value={pendingReviewerSelection[file.id] ?? ""}
+                                onChange={(event) =>
+                                  setPendingReviewerSelection((prev) => ({
+                                    ...prev,
+                                    [file.id]: event.target.value,
+                                  }))
+                                }
+                                className="min-w-0 flex-1 rounded border border-gray-300 px-1 py-0.5 text-[10px]"
+                              >
+                                {reviewerTaskAssigneeIds.map((memberId) => (
+                                  <option key={memberId} value={memberId}>
+                                    {resolveMemberName(reviewers, memberId)}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void handleApplyAssigneeChange(
+                                    file.id,
+                                    "reviewer",
+                                    pendingReviewerSelection[file.id],
+                                  )
+                                }
+                                disabled={
+                                  changingFileAssigneeKey !== null ||
+                                  !pendingReviewerSelection[file.id]
+                                }
+                                className="rounded bg-blue-600 px-1.5 py-0.5 font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {changingFileAssigneeKey ===
+                                getChangeKey(file.id, "reviewer")
+                                  ? "..."
+                                  : "Apply"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingReviewerFileId(null)}
+                                disabled={changingFileAssigneeKey !== null}
+                                className="rounded border border-gray-300 px-1.5 py-0.5 text-gray-600 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => onDeleteUploadedFile(file.fileName)}
-                          disabled={isProjectCompleted}
-                          className="absolute right-1 top-1 hidden rounded bg-white/80 px-1 py-0.5 text-[11px] text-gray-500 hover:bg-rose-50 hover:text-rose-600 group-hover:block"
-                          aria-label={`Delete ${file.fileName}`}
-                        >
-                          x
-                        </button>
+                        <ConfirmButton
+                          label="x"
+                          variant="danger"
+                          size="sm"
+                          modalHeader="Delete file?"
+                          modalBody={`"${file.fileName}" will be permanently deleted. This cannot be undone.`}
+                          confirmLabel="Delete"
+                          disabled={
+                            isProjectCompleted || deletingFileName !== null
+                          }
+                          onConfirm={() => onDeleteUploadedFile(file.fileName)}
+                          className="absolute right-1 top-1 hidden !rounded !px-1 !py-0.5 !text-[11px] group-hover:block"
+                        />
                       </div>
                     );
                   })}
@@ -272,15 +500,19 @@ export default function ProjectEditSections({
                       className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
                     >
                       {resolveMemberName(annotators, id)}
-                      <button
-                        type="button"
-                        onClick={() => onClearAssignedMember("annotator", id)}
-                        disabled={isProjectCompleted}
-                        className="rounded-sm px-1 text-xs text-gray-500 hover:bg-gray-200 hover:text-gray-700"
-                        aria-label={`Remove ${resolveMemberName(annotators, id)}`}
-                      >
-                        x
-                      </button>
+                      <ConfirmButton
+                        label="x"
+                        variant="danger"
+                        size="sm"
+                        modalHeader="Remove annotator?"
+                        modalBody={`Remove "${resolveMemberName(annotators, id)}" from this project? All their task assignments will be deleted.`}
+                        confirmLabel="Remove"
+                        disabled={
+                          isProjectCompleted || unassigningMemberId !== null
+                        }
+                        onConfirm={() => onClearAssignedMember("annotator", id)}
+                        className="!rounded-sm !px-1 !py-0.5 !text-[11px] !border-0 !bg-transparent !text-gray-500 hover:!bg-gray-200 hover:!text-gray-700"
+                      />
                     </span>
                   ))}
                 </div>
@@ -298,15 +530,19 @@ export default function ProjectEditSections({
                       className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
                     >
                       {resolveMemberName(reviewers, id)}
-                      <button
-                        type="button"
-                        onClick={() => onClearAssignedMember("reviewer", id)}
-                        disabled={isProjectCompleted}
-                        className="rounded-sm px-1 text-xs text-gray-500 hover:bg-gray-200 hover:text-gray-700"
-                        aria-label={`Remove ${resolveMemberName(reviewers, id)}`}
-                      >
-                        x
-                      </button>
+                      <ConfirmButton
+                        label="x"
+                        variant="danger"
+                        size="sm"
+                        modalHeader="Remove reviewer?"
+                        modalBody={`Remove "${resolveMemberName(reviewers, id)}" from this project? All their task assignments will be deleted.`}
+                        confirmLabel="Remove"
+                        disabled={
+                          isProjectCompleted || unassigningMemberId !== null
+                        }
+                        onConfirm={() => onClearAssignedMember("reviewer", id)}
+                        className="!rounded-sm !px-1 !py-0.5 !text-[11px] !border-0 !bg-transparent !text-gray-500 hover:!bg-gray-200 hover:!text-gray-700"
+                      />
                     </span>
                   ))}
                 </div>
@@ -366,7 +602,7 @@ export default function ProjectEditSections({
               </div>
             )}
 
-            {section.id === "annotators" &&
+            {/* {section.id === "annotators" &&
               Object.keys(annotatorFileAssignments).length > 0 && (
                 <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-2 text-xs text-gray-700">
                   <p className="font-semibold text-gray-800">Assigned files</p>
@@ -398,7 +634,7 @@ export default function ProjectEditSections({
                     )}
                   </div>
                 </div>
-              )}
+              )} */}
           </div>
         ))}
 
@@ -471,20 +707,23 @@ export default function ProjectEditSections({
       </div>
 
       <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-gray-200 pt-4">
-        <button
-          type="button"
-          onClick={onDeleteProject}
-          className="rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
-        >
-          Delete project
-        </button>
-        <button
+        <ConfirmButton
+          label="Delete project"
+          variant="danger"
+          className="!rounded-md"
+          disabled={isProjectCompleted}
+          modalHeader="Delete this project?"
+          modalBody="This will permanently delete the project and cannot be undone."
+          confirmLabel="Delete project"
+          onConfirm={onDeleteProject}
+        />
+        {/* <button
           type="button"
           onClick={onCancel}
           className="rounded-md bg-red-500 px-3 py-2 text-sm font-semibold text-white"
         >
           Cancel
-        </button>
+        </button> */}
         <ConfirmButton
           label={
             isProjectCompleted

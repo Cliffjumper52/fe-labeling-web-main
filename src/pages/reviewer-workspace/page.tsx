@@ -812,6 +812,7 @@ export default function ReviewerWorkspacePage() {
           const filesResp = await getAllFiles({
             projectId: taskById.projectId,
             reviewerId: currentUser.id,
+            status: FileStatus.PENDING_REVIEW,
           });
           const refreshedFiles = extractArrayApiData<ProjectFile>(filesResp);
           setReviewerFiles(refreshedFiles);

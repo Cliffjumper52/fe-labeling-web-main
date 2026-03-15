@@ -17,6 +17,7 @@ import {
   updateLabelPreset,
 } from "../../services/label-preset-service.service";
 import { getAllLabels } from "../../services/label-service.service";
+import { ConfirmButton } from "../../components/common/confirm-modal";
 import Pagination from "../../components/common/pagination";
 
 type Preset = {
@@ -61,6 +62,7 @@ export default function ManagerPresetsPage({
     "Descending",
   );
   const [isCreatePresetOpen, setIsCreatePresetOpen] = useState(false);
+  const [creatingPreset, setCreatingPreset] = useState(false);
   const [presetName, setPresetName] = useState("");
   const [presetDescription, setPresetDescription] = useState("");
   const [presetLabelQuery, setPresetLabelQuery] = useState("");
@@ -69,6 +71,7 @@ export default function ManagerPresetsPage({
   >([]);
   const [labelSelectError, setLabelSelectError] = useState<string | null>(null);
   const [isEditPresetOpen, setIsEditPresetOpen] = useState(false);
+  const [updatingPreset, setUpdatingPreset] = useState(false);
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
   const [editPresetName, setEditPresetName] = useState("");
   const [editPresetDescription, setEditPresetDescription] = useState("");
@@ -81,7 +84,7 @@ export default function ManagerPresetsPage({
   >(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailPreset, setDetailPreset] = useState<Preset | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
@@ -225,6 +228,7 @@ export default function ManagerPresetsPage({
   const handleCreatePreset = async (event: FormEvent) => {
     event.preventDefault();
     setPresetsError(null);
+    setCreatingPreset(true);
 
     try {
       await createLabelPreset({
@@ -238,6 +242,8 @@ export default function ManagerPresetsPage({
       await loadPresets();
     } catch (error) {
       setPresetsError(extractErrorMessage(error, "Failed to create preset."));
+    } finally {
+      setCreatingPreset(false);
     }
   };
 
@@ -306,6 +312,7 @@ export default function ManagerPresetsPage({
       return;
     }
     setPresetsError(null);
+    setUpdatingPreset(true);
 
     try {
       await updateLabelPreset(editingPresetId, {
@@ -318,6 +325,8 @@ export default function ManagerPresetsPage({
       await loadPresets();
     } catch (error) {
       setPresetsError(extractErrorMessage(error, "Failed to update preset."));
+    } finally {
+      setUpdatingPreset(false);
     }
   };
 
@@ -340,19 +349,17 @@ export default function ManagerPresetsPage({
     }
   };
 
-  const handleDeletePreset = (presetId: string) => {
-    const removePreset = async () => {
-      setPresetsError(null);
+  const handleDeletePreset = async (presetId: string) => {
+    setPresetsError(null);
 
-      try {
-        await deleteLabelPreset(presetId);
-        setPresets((prev) => prev.filter((preset) => preset.id !== presetId));
-      } catch (error) {
-        setPresetsError(extractErrorMessage(error, "Failed to delete preset."));
-      }
-    };
-
-    void removePreset();
+    try {
+      await deleteLabelPreset(presetId);
+      setPresets((prev) => prev.filter((preset) => preset.id !== presetId));
+    } catch (error) {
+      const message = extractErrorMessage(error, "Failed to delete preset.");
+      setPresetsError(message);
+      throw error;
+    }
   };
 
   const closeWithAnimation = (
@@ -554,13 +561,16 @@ export default function ManagerPresetsPage({
                 >
                   Edit
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeletePreset(preset.id)}
-                  className="text-red-500 hover:text-red-600"
-                >
-                  Delete
-                </button>
+                <ConfirmButton
+                  label="Delete"
+                  variant="danger"
+                  size="sm"
+                  className="!h-auto !border-0 !bg-transparent !p-0 text-red-500 hover:text-red-600 hover:!bg-transparent"
+                  modalHeader="Delete this preset?"
+                  modalBody={`Are you sure you want to delete ${preset.name}? This action cannot be undone.`}
+                  confirmLabel="Delete"
+                  onConfirm={() => handleDeletePreset(preset.id)}
+                />
               </div>
             </div>
           ))}
@@ -591,10 +601,11 @@ export default function ManagerPresetsPage({
               </h3>
               <button
                 type="button"
+                disabled={creatingPreset}
                 onClick={() =>
                   closeWithAnimation("createPreset", setIsCreatePresetOpen)
                 }
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
                 aria-label="Close"
               >
                 <svg
@@ -704,10 +715,17 @@ export default function ManagerPresetsPage({
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                  disabled={creatingPreset}
+                  className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <span className="text-base leading-none">+</span>
-                  New Preset
+                  {creatingPreset ? (
+                    "Creating..."
+                  ) : (
+                    <>
+                      <span className="text-base leading-none">+</span>
+                      New Preset
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -728,11 +746,12 @@ export default function ManagerPresetsPage({
               </h3>
               <button
                 type="button"
+                disabled={updatingPreset}
                 onClick={() => {
                   closeWithAnimation("editPreset", setIsEditPresetOpen);
                   resetEditPresetForm();
                 }}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
                 aria-label="Close"
               >
                 <svg
@@ -844,19 +863,21 @@ export default function ManagerPresetsPage({
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
+                  disabled={updatingPreset}
                   onClick={() => {
                     closeWithAnimation("editPreset", setIsEditPresetOpen);
                     resetEditPresetForm();
                   }}
-                  className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                  disabled={updatingPreset}
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Save changes
+                  {updatingPreset ? "Updating..." : "Save changes"}
                 </button>
               </div>
             </form>
