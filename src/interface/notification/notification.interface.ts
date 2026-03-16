@@ -1,4 +1,3 @@
-import type { NotificationType } from "../enums/domain.enums";
 import type {
   BaseEntityModel,
   EntityReference,
@@ -7,10 +6,8 @@ import type {
 export interface Notification extends BaseEntityModel {
   accountId: string;
   account?: EntityReference;
-  notificationType: NotificationType;
   title: string;
   content: string;
-  relatedEntityId: string | null;
   additionalData: Record<string, unknown> | null;
   isRead: boolean;
   readAt: string | null;
