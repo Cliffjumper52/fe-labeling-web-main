@@ -99,3 +99,18 @@ export const deleteLabelPreset = async (id: string) => {
     throw error;
   }
 };
+
+export const getLabelPresetStatistics = async (createdById?: string) => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (createdById) queryParams.append("createdById", createdById);
+
+    const query = queryParams.toString();
+    const resp = await api.get(
+      `/label-presets/statistics${query ? `?${query}` : ""}`,
+    );
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};

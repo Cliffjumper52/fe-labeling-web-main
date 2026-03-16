@@ -8,7 +8,10 @@ type Props = {
   selectedFile: ProjectFile | null;
   loadingAssignedFileLabels: boolean;
   assignedFileLabels: FileLabel[];
+  loadingReassignedFileLabels: boolean;
+  reassignedFileLabels: FileLabel[];
   assignedFileLabelsError: string | null;
+  reassignedFileLabelsError: string | null;
   labelNameById: Map<string, string>;
   removingFileLabelId: string | null;
   labelSearch: string;
@@ -38,7 +41,10 @@ export default function AssignedLabelsPanel({
   selectedFile,
   loadingAssignedFileLabels,
   assignedFileLabels,
+  loadingReassignedFileLabels,
+  reassignedFileLabels,
   assignedFileLabelsError,
+  reassignedFileLabelsError,
   labelNameById,
   removingFileLabelId,
   labelSearch,
@@ -153,6 +159,87 @@ export default function AssignedLabelsPanel({
                       Resubmit
                     </button>
                   ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <p className="text-xs font-semibold text-gray-500">
+          Previous reassigned labels (read-only)
+        </p>
+        <p className="mt-1 text-[11px] text-gray-500">
+          Historical labels from earlier annotator attempts for this file.
+        </p>
+
+        <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          {loadingReassignedFileLabels
+            ? "Loading reassigned labels..."
+            : `${reassignedFileLabels.length} reassigned labels`}
+        </div>
+
+        {reassignedFileLabelsError ? (
+          <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700">
+            {reassignedFileLabelsError}
+          </p>
+        ) : null}
+
+        <div className="mt-3 space-y-2">
+          {!loadingReassignedFileLabels && reassignedFileLabels.length === 0 ? (
+            <p className="text-xs text-gray-500">
+              No reassigned label history for this file.
+            </p>
+          ) : null}
+
+          {reassignedFileLabels.map((item) => {
+            const labelName = item.labelId
+              ? (labelNameById.get(item.labelId) ?? item.labelId)
+              : "Unassigned";
+            const annotatorName =
+              typeof (item.annotator as { username?: unknown } | undefined)
+                ?.username === "string"
+                ? ((item.annotator as { username?: string }).username ??
+                  item.annotatorId)
+                : item.annotatorId;
+
+            return (
+              <div
+                key={item.id}
+                className="rounded-md border border-gray-200 bg-white px-3 py-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-gray-800">
+                      {labelName}
+                    </p>
+                    <p className="text-[11px] text-gray-500">
+                      Annotator: {annotatorName}
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded px-2 py-[2px] text-[11px] font-semibold ${mapFileLabelStatusToBadge(item.status)}`}
+                  >
+                    {mapFileLabelStatusToText(item.status)}
+                  </span>
+                </div>
+
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onOpenWorkflowModal(
+                        "view",
+                        labelName,
+                        item.labelId,
+                        item.id,
+                      )
+                    }
+                    className="rounded-md border border-gray-300 px-2 py-1 text-[11px] font-semibold text-gray-700"
+                  >
+                    View details
+                  </button>
                 </div>
               </div>
             );

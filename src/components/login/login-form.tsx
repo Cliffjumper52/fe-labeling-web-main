@@ -1,26 +1,30 @@
 import React, { useState } from "react";
 
 interface LoginFormProps {
-  onLogin: (email: string, password: string) => void;
+  onLogin: (email: string, password: string, rememberMe: boolean) => void;
   initialEmail?: string;
   initialPassword?: string;
+  initialRememberMe?: boolean;
   isLoading?: boolean;
+  handleForgotPassword?: () => void;
 }
 
 export default function LoginForm({
   onLogin,
   initialEmail = "",
   initialPassword = "",
+  initialRememberMe = false,
   isLoading = false,
+  handleForgotPassword,
 }: LoginFormProps) {
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState(initialPassword);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(initialRememberMe);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(email.trim(), password);
+    onLogin(email.trim(), password, rememberMe);
   };
 
   return (
@@ -31,7 +35,13 @@ export default function LoginForm({
         </label>
         <div className="login-input-wrap">
           <div className="login-input-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" />
               <path d="m22 8-10 6L2 8" />
             </svg>
@@ -54,7 +64,13 @@ export default function LoginForm({
         </label>
         <div className="login-input-wrap">
           <div className="login-input-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <rect x="3" y="11" width="18" height="10" rx="2" />
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
@@ -74,7 +90,13 @@ export default function LoginForm({
             className="login-eye"
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               {showPassword ? (
                 <>
                   <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" />
@@ -103,7 +125,11 @@ export default function LoginForm({
           />
           Remember me
         </label>
-        <button type="button" className="login-forgot">
+        <button
+          type="button"
+          className="login-forgot"
+          onClick={handleForgotPassword}
+        >
           Forgot password?
         </button>
       </div>

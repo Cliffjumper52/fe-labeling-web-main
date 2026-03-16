@@ -14,11 +14,14 @@ import {
   deleteLabelPreset,
   getLabelPresetById,
   getLabelPresetsPaginated,
+  getLabelPresetStatistics,
   updateLabelPreset,
 } from "../../services/label-preset-service.service";
 import { getAllLabels } from "../../services/label-service.service";
 import { ConfirmButton } from "../../components/common/confirm-modal";
 import Pagination from "../../components/common/pagination";
+import StatisticsSummary from "../../components/common/statistics-summary";
+import { useAuth } from "../../context/auth-context.context";
 
 type Preset = {
   id: string;
@@ -47,6 +50,7 @@ export default function ManagerPresetsPage({
   initialPresets,
 }: ManagerPresetsPageProps) {
   const isAdmin = mode === "admin";
+  const { getUserInfo } = useAuth();
   const [presets, setPresets] = useState<Preset[]>(() => initialPresets ?? []);
   const hasPresets = presets.length > 0;
   const [labels, setLabels] = useState<ApiLabel[]>([]);
@@ -88,6 +92,8 @@ export default function ManagerPresetsPage({
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
+
+  const user = getUserInfo();
 
   const labelMap = useMemo(() => {
     return new Map(labels.map((label) => [label.id, label.name]));
@@ -134,6 +140,15 @@ export default function ManagerPresetsPage({
       return message;
     }
     return error instanceof Error ? error.message : fallback;
+  };
+
+  const formatAverage = (value: number | string | null | undefined): string => {
+    const numericValue = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return "-";
+    }
+
+    return numericValue.toFixed(2);
   };
 
   const normalizePresets = (apiPresets: ApiLabelPreset[]): Preset[] => {
@@ -395,6 +410,25 @@ export default function ManagerPresetsPage({
       </div>
 
       <div className="mb-4 h-px w-full bg-gray-200" />
+
+      <StatisticsSummary
+        className="mb-4"
+        fetchStatistics={() => getLabelPresetStatistics(undefined)}
+        cards={[
+          { key: "totalPresets", label: "Total presets" },
+          { key: "presetsWithLabels", label: "With labels" },
+          {
+            key: "avgLabelsPerPreset",
+            label: "Avg labels/preset",
+            formatValue: formatAverage,
+          },
+          {
+            key: "avgPresetsPerLabel",
+            label: "Avg presets/label",
+            formatValue: formatAverage,
+          },
+        ]}
+      />
 
       {isLoading && (
         <div className="mb-4 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">

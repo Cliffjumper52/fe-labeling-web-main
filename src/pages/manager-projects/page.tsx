@@ -13,10 +13,12 @@ import type {
 import type { Project as ApiProject } from "../../interface/project/project.interface";
 import {
   createProject,
+  getProjectStatistics,
   getProjectsPaginated,
 } from "../../services/project-service.service";
 import { getLabelPresetsPaginated } from "../../services/label-preset-service.service";
 import Pagination from "../../components/common/pagination";
+import StatisticsSummary from "../../components/common/statistics-summary";
 import CreateProjectModal from "../../components/manager/project/create-project-modal";
 import ProjectFilters from "../../components/manager/project/project-filters";
 import ProjectTable from "../../components/manager/project/project-table";
@@ -322,6 +324,17 @@ export default function ManagerProjectsPage() {
           {projectsError}
         </div>
       )}
+
+      <StatisticsSummary
+        className="mt-4"
+        fetchStatistics={() => getProjectStatistics(user?.id)}
+        cards={[
+          { key: "totalCount", label: "Total projects" },
+          { key: "activeCount", label: "Active" },
+          { key: "completedCount", label: "Completed" },
+          { key: "archivedCount", label: "Archived" },
+        ]}
+      />
 
       <ProjectFilters
         projectSearch={projectSearch}

@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   deleteProject,
+  getProjectStatistics,
   getProjectsPaginated,
 } from "../../services/project-service.service";
 import type { DataType } from "../../interface/enums/domain.enums";
 import { ConfirmButton } from "../../components/common/confirm-modal";
+import StatisticsSummary from "../../components/common/statistics-summary";
 
 type ApiEnvelope<T> = { data?: T; message?: string | string[] };
 type PaginatedPayload<T> = {
@@ -89,6 +91,17 @@ export default function AdminProjectsPage() {
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold text-gray-800">Projects</h2>
       </div>
+
+      <StatisticsSummary
+        className="mb-4"
+        fetchStatistics={getProjectStatistics}
+        cards={[
+          { key: "totalCount", label: "Total projects" },
+          { key: "activeCount", label: "Active" },
+          { key: "completedCount", label: "Completed" },
+          { key: "archivedCount", label: "Archived" },
+        ]}
+      />
 
       <div className="mb-4 flex gap-2">
         <input

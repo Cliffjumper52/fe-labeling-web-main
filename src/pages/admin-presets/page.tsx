@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   deleteLabelPreset,
+  getLabelPresetStatistics,
   getLabelPresetsPaginated,
 } from "../../services/label-preset-service.service";
 import { ConfirmButton } from "../../components/common/confirm-modal";
+import StatisticsSummary from "../../components/common/statistics-summary";
 
 type ApiEnvelope<T> = { data?: T; message?: string | string[] };
 type PaginatedPayload<T> = {
@@ -29,6 +31,15 @@ const normalize = <T,>(raw: unknown): PaginatedPayload<T> => {
     totalPages: env?.data?.totalPages,
     currentPage: env?.data?.currentPage,
   };
+};
+
+const formatAverage = (value: number | string | null | undefined): string => {
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return "-";
+  }
+
+  return numericValue.toFixed(2);
 };
 
 export default function AdminPresetsPage() {
@@ -88,6 +99,25 @@ export default function AdminPresetsPage() {
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold text-gray-800">Presets</h2>
       </div>
+
+      <StatisticsSummary
+        className="mb-4"
+        fetchStatistics={getLabelPresetStatistics}
+        cards={[
+          { key: "totalPresets", label: "Total presets" },
+          { key: "presetsWithLabels", label: "With labels" },
+          {
+            key: "avgLabelsPerPreset",
+            label: "Avg labels/preset",
+            formatValue: formatAverage,
+          },
+          {
+            key: "avgPresetsPerLabel",
+            label: "Avg presets/label",
+            formatValue: formatAverage,
+          },
+        ]}
+      />
 
       <div className="mb-4 flex gap-2">
         <input

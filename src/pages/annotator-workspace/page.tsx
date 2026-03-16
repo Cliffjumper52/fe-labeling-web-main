@@ -135,9 +135,17 @@ export default function AnnotatorWorkspacePage() {
   const [assignedFiles, setAssignedFiles] = useState<ProjectFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<ProjectFile | null>(null);
   const [assignedFileLabels, setAssignedFileLabels] = useState<FileLabel[]>([]);
+  const [reassignedFileLabels, setReassignedFileLabels] = useState<FileLabel[]>(
+    [],
+  );
   const [loadingAssignedFileLabels, setLoadingAssignedFileLabels] =
     useState(false);
+  const [loadingReassignedFileLabels, setLoadingReassignedFileLabels] =
+    useState(false);
   const [assignedFileLabelsError, setAssignedFileLabelsError] = useState<
+    string | null
+  >(null);
+  const [reassignedFileLabelsError, setReassignedFileLabelsError] = useState<
     string | null
   >(null);
   const [removingFileLabelId, setRemovingFileLabelId] = useState<string | null>(
@@ -323,9 +331,11 @@ export default function AnnotatorWorkspacePage() {
     }
 
     return (
-      assignedFileLabels.find((item) => item.id === workflowFileLabelId) ?? null
+      assignedFileLabels.find((item) => item.id === workflowFileLabelId) ??
+      reassignedFileLabels.find((item) => item.id === workflowFileLabelId) ??
+      null
     );
-  }, [assignedFileLabels, workflowFileLabelId]);
+  }, [assignedFileLabels, reassignedFileLabels, workflowFileLabelId]);
 
   const workflowChecklistHistory = useMemo<ChecklistAnswer[]>(() => {
     const snapshots = workflowFileLabel?.checklistAnswers;
@@ -490,34 +500,56 @@ export default function AnnotatorWorkspacePage() {
     const loadAssignedFileLabels = async () => {
       if (!selectedFile?.id) {
         setAssignedFileLabels([]);
+        setReassignedFileLabels([]);
         setAssignedFileLabelsError(null);
+        setReassignedFileLabelsError(null);
         return;
       }
 
       setLoadingAssignedFileLabels(true);
+      setLoadingReassignedFileLabels(true);
       setAssignedFileLabelsError(null);
+      setReassignedFileLabelsError(null);
 
       try {
-        const resp = await getAllFileLabels({ fileId: selectedFile.id });
+        const [activeResp, reassignedResp] = await Promise.all([
+          getAllFileLabels({ fileId: selectedFile.id }),
+          getAllFileLabels(
+            {
+              fileId: selectedFile.id,
+              status: "reassigned",
+            },
+            false,
+            false,
+          ),
+        ]);
         if (cancelled) {
           return;
         }
 
-        setAssignedFileLabels(extractArrayApiData<FileLabel>(resp));
+        setAssignedFileLabels(extractArrayApiData<FileLabel>(activeResp));
+        setReassignedFileLabels(extractArrayApiData<FileLabel>(reassignedResp));
       } catch (error) {
         if (cancelled) {
           return;
         }
 
         setAssignedFileLabels([]);
+        setReassignedFileLabels([]);
         setAssignedFileLabelsError(
           error instanceof Error
             ? error.message
             : "Failed to load assigned labels.",
         );
+        setReassignedFileLabelsError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load reassigned labels.",
+        );
       } finally {
         if (!cancelled) {
           setLoadingAssignedFileLabels(false);
+          setLoadingReassignedFileLabels(false);
         }
       }
     };
@@ -864,7 +896,10 @@ export default function AnnotatorWorkspacePage() {
           selectedFile={selectedFile}
           loadingAssignedFileLabels={loadingAssignedFileLabels}
           assignedFileLabels={assignedFileLabels}
+          loadingReassignedFileLabels={loadingReassignedFileLabels}
+          reassignedFileLabels={reassignedFileLabels}
           assignedFileLabelsError={assignedFileLabelsError}
+          reassignedFileLabelsError={reassignedFileLabelsError}
           labelNameById={labelNameById}
           removingFileLabelId={removingFileLabelId}
           labelSearch={labelSearch}

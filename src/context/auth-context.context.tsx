@@ -6,14 +6,21 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getInfoByToken } from "../services/auth-service.service";
+import { getInfoByToken } from "../services/auth-service";
 import {
   clearAuthTokens,
   getAccessToken,
+  getRememberMePreference,
   getRefreshToken,
   setAuthTokens as persistAuthTokens,
 } from "../utils/auth-storage";
 import type { Account } from "../interface";
+
+const USER_INFO_KEY = "user";
+
+type SetAuthTokensOptions = {
+  rememberMe?: boolean;
+};
 
 type AuthContextValue = {
   accessToken: string | null;
@@ -22,9 +29,10 @@ type AuthContextValue = {
   setAuthTokens: (
     accessToken?: string | null,
     refreshToken?: string | null,
+    options?: SetAuthTokensOptions,
   ) => void;
   getUserInfo: () => Account | null;
-  setUserInfo: () => Promise<void>;
+  setUserInfo: (rememberMe?: boolean) => Promise<void>;
   logout: () => void;
 };
 
@@ -48,8 +56,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const setAuthTokens = useCallback(
-    (nextAccessToken?: string | null, nextRefreshToken?: string | null) => {
-      persistAuthTokens(nextAccessToken, nextRefreshToken);
+    (
+      nextAccessToken?: string | null,
+      nextRefreshToken?: string | null,
+      options?: SetAuthTokensOptions,
+    ) => {
+      persistAuthTokens(nextAccessToken, nextRefreshToken, options);
       syncTokensFromCookies();
     },
     [syncTokensFromCookies],
@@ -62,17 +74,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
     clearUserInfo();
   }, []);
 
-  const setUserInfo = useCallback(async () => {
-    try {
-      const userInfoResp = await getInfoByToken();
-      localStorage.setItem("user", JSON.stringify(userInfoResp?.data?.data));
-    } catch {
-      logout();
-    }
-  }, [logout]);
+  const setUserInfo = useCallback(
+    async (rememberMe?: boolean) => {
+      try {
+        const userInfoResp = await getInfoByToken();
+        const userInfo = JSON.stringify(userInfoResp?.data?.data);
+        const shouldRemember =
+          typeof rememberMe === "boolean"
+            ? rememberMe
+            : getRememberMePreference();
+
+        if (shouldRemember) {
+          localStorage.setItem(USER_INFO_KEY, userInfo);
+          sessionStorage.removeItem(USER_INFO_KEY);
+        } else {
+          sessionStorage.setItem(USER_INFO_KEY, userInfo);
+          localStorage.removeItem(USER_INFO_KEY);
+        }
+      } catch {
+        logout();
+      }
+    },
+    [logout],
+  );
 
   const getUserInfo = useCallback(() => {
-    const userInfoStr = localStorage.getItem("user");
+    const userInfoStr =
+      sessionStorage.getItem(USER_INFO_KEY) ??
+      localStorage.getItem(USER_INFO_KEY);
     if (!userInfoStr) {
       return null;
     }
@@ -85,7 +114,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const clearUserInfo = useCallback(() => {
-    localStorage.removeItem("user");
+    localStorage.removeItem(USER_INFO_KEY);
+    sessionStorage.removeItem(USER_INFO_KEY);
   }, []);
   const value = useMemo<AuthContextValue>(
     () => ({

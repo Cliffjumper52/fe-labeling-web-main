@@ -75,8 +75,8 @@ export const resetPassword = async (email: string) => {
 export const refreshToken = async () => {
   try {
     //intentional, use axios directly to avoid infinite loop of interceptors when refreshing token
-    const resp = refreshApi.post("/auth/refresh", {});
-    return resp;
+    const resp = await refreshApi.post("/auth/refresh", {});
+    return resp.data;
   } catch (error) {
     throw error;
   }

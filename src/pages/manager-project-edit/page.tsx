@@ -522,6 +522,30 @@ export default function ManagerProjectEditPage() {
     );
   }, [projectFiles]);
 
+  const hasApprovedFile = useMemo(() => {
+    return projectFiles.some((file) => file.status === "approved");
+  }, [projectFiles]);
+
+  const annotatorIdsWithApprovedFiles = useMemo(() => {
+    const ids = new Set<string>();
+    projectFiles.forEach((file) => {
+      if (file.status === "approved" && file.annotatorId) {
+        ids.add(file.annotatorId);
+      }
+    });
+    return Array.from(ids);
+  }, [projectFiles]);
+
+  const reviewerIdsWithApprovedFiles = useMemo(() => {
+    const ids = new Set<string>();
+    projectFiles.forEach((file) => {
+      if (file.status === "approved" && file.reviewerId) {
+        ids.add(file.reviewerId);
+      }
+    });
+    return Array.from(ids);
+  }, [projectFiles]);
+
   const mapLabelPreset = (preset: ApiLabelPreset): Preset => {
     const labelRefs = Array.isArray(preset.labels)
       ? (preset.labels as Array<{ id: string; name?: string }>).filter(
@@ -1008,26 +1032,25 @@ export default function ManagerProjectEditPage() {
     });
   };
 
-  const removeMemberAssignments = (
-    memberId: string,
-    setAssignments: Dispatch<SetStateAction<Record<string, string[]>>>,
-  ) => {
-    setAssignments((prev) => {
-      const next: Record<string, string[]> = {};
-      Object.entries(prev).forEach(([fileId, ids]) => {
-        const filtered = ids.filter((id) => id !== memberId);
-        if (filtered.length > 0) {
-          next[fileId] = filtered;
-        }
-      });
-      return next;
-    });
-  };
-
   const handleClearAssignedMember = async (
     role: "annotator" | "reviewer",
     memberId: string,
   ) => {
+    const hasApprovedAssignment = projectFiles.some((file) => {
+      if (file.status !== "approved") {
+        return false;
+      }
+
+      return role === "annotator"
+        ? file.annotatorId === memberId
+        : file.reviewerId === memberId;
+    });
+
+    if (hasApprovedAssignment) {
+      toast.error("Cannot remove a member who has approved files.");
+      return;
+    }
+
     const tasksToDelete = projectTasks.filter(
       (task) => task.assignedTo === memberId && task.assignedUserRole === role,
     );
@@ -1038,7 +1061,7 @@ export default function ManagerProjectEditPage() {
         tasksToDelete.map((task) => deleteProjectTask(task.id)),
       );
       if (id) {
-        await loadAssignmentsFromTasks(id);
+        await Promise.all([loadAssignmentsFromTasks(id), loadProjectFiles(id)]);
       }
       if (role === "annotator" && selectedAnnotatorId === memberId) {
         setSelectedAnnotatorId(null);
@@ -1563,6 +1586,7 @@ export default function ManagerProjectEditPage() {
             snapshots={projectSnapshots}
             loading={snapshotsLoading}
             creating={snapshotCreating}
+            canCreateSnapshot={hasApprovedFile}
             deletingSnapshotId={deletingSnapshotId}
             snapshotName={snapshotName}
             snapshotDescription={snapshotDescription}
@@ -1581,6 +1605,8 @@ export default function ManagerProjectEditPage() {
             projectFiles={projectFiles}
             assignedAnnotatorIds={assignedAnnotatorIds}
             assignedReviewerIds={assignedReviewerIds}
+            annotatorIdsWithApprovedFiles={annotatorIdsWithApprovedFiles}
+            reviewerIdsWithApprovedFiles={reviewerIdsWithApprovedFiles}
             annotatorTaskAssigneeIds={annotatorTaskAssigneeIds}
             reviewerTaskAssigneeIds={reviewerTaskAssigneeIds}
             configuredLabels={configuredLabels}

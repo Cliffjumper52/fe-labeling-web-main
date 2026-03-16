@@ -4,6 +4,7 @@ type Props = {
   snapshots: ProjectSnapshotListItem[];
   loading: boolean;
   creating: boolean;
+  canCreateSnapshot: boolean;
   deletingSnapshotId: string | null;
   snapshotName: string;
   snapshotDescription: string;
@@ -32,6 +33,7 @@ export default function ProjectEditSnapshots({
   snapshots,
   loading,
   creating,
+  canCreateSnapshot,
   deletingSnapshotId,
   snapshotName,
   snapshotDescription,
@@ -83,12 +85,17 @@ export default function ProjectEditSnapshots({
             <button
               type="button"
               onClick={onCreateSnapshot}
-              disabled={creating}
+              disabled={creating || !canCreateSnapshot}
               className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
             >
               {creating ? "Creating..." : "Create"}
             </button>
           </div>
+          {!canCreateSnapshot && (
+            <p className="text-xs text-amber-700">
+              At least one file must be approved before creating a snapshot.
+            </p>
+          )}
         </div>
       </div>
 

@@ -97,3 +97,18 @@ export const restoreCategory = async (id: string) => {
     throw error;
   }
 };
+
+export const getLabelCategoryStatistics = async (createdById?: string) => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (createdById) queryParams.append("createdById", createdById);
+
+    const query = queryParams.toString();
+    const resp = await api.get(
+      `/label-categories/statistics${query ? `?${query}` : ""}`,
+    );
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};

@@ -17,6 +17,7 @@ import type { LabelChecklistQuestion } from "../../interface/label-checklist-que
 import {
   createLabel,
   deleteLabel,
+  getLabelStatistics,
   getLabelPaginated,
   updateLabel,
 } from "../../services/label-service.service";
@@ -29,6 +30,8 @@ import {
 import { getAllCategories } from "../../services/label-category-service.service";
 import { ConfirmButton } from "../../components/common/confirm-modal";
 import Pagination from "../../components/common/pagination";
+import StatisticsSummary from "../../components/common/statistics-summary";
+import { useAuth } from "../../context/auth-context.context";
 
 type UiLabelCategory = {
   id: string;
@@ -109,6 +112,8 @@ export default function ManagerLabelsPage({
   initialLabels,
 }: ManagerLabelsPageProps) {
   const isAdmin = mode === "admin";
+  const { getUserInfo } = useAuth();
+  const user = getUserInfo();
 
   const [labels, setLabels] = useState<Label[]>(() => {
     return initialLabels ?? [];
@@ -358,27 +363,6 @@ export default function ManagerLabelsPage({
 
     return sorted;
   }, [labels, order, orderBy, search]);
-
-  const labelStats = useMemo(() => {
-    return labels.reduce(
-      (acc, label) => {
-        acc.total += 1;
-        const questions = label.questions ?? [];
-        if (questions.length > 0) {
-          acc.withQuestions += 1;
-        }
-        for (const question of questions) {
-          if (question.role === "Annotator") {
-            acc.annotator += 1;
-          } else {
-            acc.reviewer += 1;
-          }
-        }
-        return acc;
-      },
-      { total: 0, withQuestions: 0, annotator: 0, reviewer: 0 },
-    );
-  }, [labels]);
 
   const resetCreateLabelForm = () => {
     setLabelName("");
@@ -813,40 +797,15 @@ export default function ManagerLabelsPage({
 
         <div className="h-px w-full bg-gray-200" />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
-              Total labels
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">
-              {labelStats.total}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
-              With questions
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">
-              {labelStats.withQuestions}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
-              Annotator qs
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">
-              {labelStats.annotator}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
-              Reviewer qs
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">
-              {labelStats.reviewer}
-            </p>
-          </div>
-        </div>
+        <StatisticsSummary
+          fetchStatistics={() => getLabelStatistics(undefined)}
+          cards={[
+            { key: "totalLabels", label: "Total labels" },
+            { key: "labelsWithQuestions", label: "With questions" },
+            { key: "annotatorQuestions", label: "Annotator qs" },
+            { key: "reviewerQuestions", label: "Reviewer qs" },
+          ]}
+        />
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr_1fr]">
           <div className="flex flex-col gap-2">
