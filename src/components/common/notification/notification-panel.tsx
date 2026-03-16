@@ -8,12 +8,11 @@ import {
   getUnreadCount,
   markAllNotificationsAsRead,
   markManyNotificationsAsRead,
-  markNotificationAsRead,
 } from "../../../services/notification-service.service";
 import { getAccessToken } from "../../../utils/auth-storage";
 import NotificationList from "./notification-list";
 
-const WS_URL = "ws://localhost:2000/notifications";
+const WS_URL = "http://localhost:2000/notifications";
 const PAGE_LIMIT = 10;
 
 export default function NotificationPanel() {
@@ -121,7 +120,9 @@ export default function NotificationPanel() {
     const token = getAccessToken();
     const socket: Socket = io(WS_URL, {
       autoConnect: false,
-      auth: { token: token ? `Bearer ${token}` : "" },
+      extraHeaders: {
+        Authorization: `Bearer ${token}`,
+      },
     });
     socketRef.current = socket;
     socket.connect();
@@ -132,6 +133,10 @@ export default function NotificationPanel() {
 
     socket.on("connect_error", (err) => {
       console.error("[NotificationPanel] Socket connection error:", err.message);
+    });
+
+    socket.onAny((event, ...args) => {
+      console.log(`[NotificationPanel] Socket event: ${event}`, args);
     });
 
     socket.on(
@@ -179,8 +184,13 @@ export default function NotificationPanel() {
         } else {
           const ids = new Set(payload.notificationIds);
           setNotifications((prev) => {
+            const removedUnreadCount = prev.filter(
+              (n) => ids.has(n.id) && !n.isRead,
+            ).length;
             const next = prev.filter((n) => !ids.has(n.id));
-            setUnreadCount(next.filter((n) => !n.isRead).length);
+            setUnreadCount((current) =>
+              Math.max(0, current - removedUnreadCount),
+            );
             return next;
           });
         }
@@ -191,6 +201,14 @@ export default function NotificationPanel() {
       socket.disconnect();
       socketRef.current = null;
     };
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      socketRef.current?.disconnect();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
   // Close panel on outside click
@@ -208,7 +226,7 @@ export default function NotificationPanel() {
   const handleMarkAsRead = async (notification: Notification) => {
     if (notification.isRead) return;
     try {
-      await markNotificationAsRead(notification.id);
+      await markManyNotificationsAsRead([notification.id]);
       setNotifications((prev) =>
         prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)),
       );

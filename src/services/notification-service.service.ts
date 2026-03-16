@@ -42,18 +42,10 @@ export const getNotifications = async (
   }
 };
 
-export const markNotificationAsRead = async (id: string) => {
-  try {
-    const resp = await api.patch(`/notifications/${id}/read`);
-    return resp.data;
-  } catch (error) {
-    throw error;
-  }
-};
 
 export const markManyNotificationsAsRead = async (notificationIds: string[]) => {
   try {
-    const resp = await api.post("/notifications/read", { notificationIds });
+    const resp = await api.patch("/notifications/read", { notificationIds });
     return resp.data;
   } catch (error) {
     throw error;

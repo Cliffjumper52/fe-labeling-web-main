@@ -65,7 +65,6 @@ function formatRelativeTime(dateString: string): string {
 }
 
 function getNotificationType(notification: Notification): string {
-  if (notification.notificationType) return notification.notificationType;
   const additionalType = (
     notification.additionalData as Record<string, unknown> | null
   )?.type as string | undefined;
