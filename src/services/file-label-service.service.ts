@@ -33,6 +33,7 @@ export const deleteFileLabel = async (id: string) => {
 export const getAllFileLabels = async (
   filter: FilterFileLabelQueryDto,
   includeDeleted: boolean = false,
+  excludeReassigned?: boolean,
 ) => {
   try {
     const queryParams = new URLSearchParams();
@@ -51,6 +52,8 @@ export const getAllFileLabels = async (
     if (filter.status) queryParams.append("status", filter.status);
     if (includeDeleted)
       queryParams.append("includeDeleted", includeDeleted.toString());
+    if (excludeReassigned !== undefined)
+      queryParams.append("excludeReassigned", excludeReassigned.toString());
     const resp = await api.get(`/file-labels/all?${queryParams.toString()}`);
     return resp.data;
   } catch (error) {
@@ -61,6 +64,7 @@ export const getAllFileLabels = async (
 export const getFileLabelsPaginated = async (
   filter: FilterFileLabelQueryDto,
   includeDeleted: boolean = false,
+  excludeReassigned?: boolean,
 ) => {
   try {
     const queryParams = new URLSearchParams();
@@ -79,6 +83,8 @@ export const getFileLabelsPaginated = async (
     if (filter.status) queryParams.append("status", filter.status);
     if (includeDeleted)
       queryParams.append("includeDeleted", includeDeleted.toString());
+    if (excludeReassigned !== undefined)
+      queryParams.append("excludeReassigned", excludeReassigned.toString());
     const resp = await api.get(`/file-labels?${queryParams.toString()}`);
     return resp.data;
   } catch (error) {

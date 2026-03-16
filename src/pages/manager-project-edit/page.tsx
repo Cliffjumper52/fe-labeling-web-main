@@ -43,11 +43,13 @@ import {
   getFilesPaginated,
   getUnassignedFiles,
   deleteFile,
+  updateFile,
 } from "../../services/file-service.service";
 import { getAllLabels } from "../../services/label-service.service";
 import { getAllAccounts } from "../../services/account-service.service";
 import {
   createProjectTask,
+  deleteProjectTask,
   getManagerProjectTasks,
 } from "../../services/project-task-service.service";
 import type { ProjectTask } from "../../interface/project-task/project-task.interface";
@@ -401,6 +403,14 @@ export default function ManagerProjectEditPage() {
   const snapshotExportPollingRef = useRef<number | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [deletingFileName, setDeletingFileName] = useState<string | null>(null);
+  const [changingFileAssigneeKey, setChangingFileAssigneeKey] = useState<
+    string | null
+  >(null);
+  const [unassigningMemberId, setUnassigningMemberId] = useState<string | null>(
+    null,
+  );
+  const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
   const [annotators, setAnnotators] = useState<TeamMember[]>([]);
   const [reviewers, setReviewers] = useState<TeamMember[]>([]);
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
@@ -428,6 +438,36 @@ export default function ManagerProjectEditPage() {
     }
     return Array.from(ids);
   }, [reviewerFileAssignments, selectedReviewerId]);
+
+  const annotatorTaskAssigneeIds = useMemo(() => {
+    return Array.from(
+      new Set(
+        projectTasks
+          .filter(
+            (task) =>
+              task.assignedUserRole === "annotator" &&
+              typeof task.assignedTo === "string" &&
+              task.assignedTo.trim().length > 0,
+          )
+          .map((task) => task.assignedTo),
+      ),
+    );
+  }, [projectTasks]);
+
+  const reviewerTaskAssigneeIds = useMemo(() => {
+    return Array.from(
+      new Set(
+        projectTasks
+          .filter(
+            (task) =>
+              task.assignedUserRole === "reviewer" &&
+              typeof task.assignedTo === "string" &&
+              task.assignedTo.trim().length > 0,
+          )
+          .map((task) => task.assignedTo),
+      ),
+    );
+  }, [projectTasks]);
 
   const selectedPresets = useMemo(() => {
     if (selectedPresetIds.length === 0) {
@@ -480,6 +520,30 @@ export default function ManagerProjectEditPage() {
       projectFiles.length > 0 &&
       projectFiles.every((file) => file.status === "approved")
     );
+  }, [projectFiles]);
+
+  const hasApprovedFile = useMemo(() => {
+    return projectFiles.some((file) => file.status === "approved");
+  }, [projectFiles]);
+
+  const annotatorIdsWithApprovedFiles = useMemo(() => {
+    const ids = new Set<string>();
+    projectFiles.forEach((file) => {
+      if (file.status === "approved" && file.annotatorId) {
+        ids.add(file.annotatorId);
+      }
+    });
+    return Array.from(ids);
+  }, [projectFiles]);
+
+  const reviewerIdsWithApprovedFiles = useMemo(() => {
+    const ids = new Set<string>();
+    projectFiles.forEach((file) => {
+      if (file.status === "approved" && file.reviewerId) {
+        ids.add(file.reviewerId);
+      }
+    });
+    return Array.from(ids);
   }, [projectFiles]);
 
   const mapLabelPreset = (preset: ApiLabelPreset): Preset => {
@@ -585,6 +649,7 @@ export default function ManagerProjectEditPage() {
         limit: 200,
       });
       const tasks = extractArray<ProjectTask>(response);
+      setProjectTasks(tasks);
       setAnnotatorFileAssignments(
         buildAssignmentsFromTasks(tasks, "annotator"),
       );
@@ -967,37 +1032,47 @@ export default function ManagerProjectEditPage() {
     });
   };
 
-  const removeMemberAssignments = (
-    memberId: string,
-    setAssignments: Dispatch<SetStateAction<Record<string, string[]>>>,
-  ) => {
-    setAssignments((prev) => {
-      const next: Record<string, string[]> = {};
-      Object.entries(prev).forEach(([fileId, ids]) => {
-        const filtered = ids.filter((id) => id !== memberId);
-        if (filtered.length > 0) {
-          next[fileId] = filtered;
-        }
-      });
-      return next;
-    });
-  };
-
-  const handleClearAssignedMember = (
+  const handleClearAssignedMember = async (
     role: "annotator" | "reviewer",
-    id: string,
+    memberId: string,
   ) => {
-    if (role === "annotator") {
-      removeMemberAssignments(id, setAnnotatorFileAssignments);
-      if (selectedAnnotatorId === id) {
-        setSelectedAnnotatorId(null);
+    const hasApprovedAssignment = projectFiles.some((file) => {
+      if (file.status !== "approved") {
+        return false;
       }
+
+      return role === "annotator"
+        ? file.annotatorId === memberId
+        : file.reviewerId === memberId;
+    });
+
+    if (hasApprovedAssignment) {
+      toast.error("Cannot remove a member who has approved files.");
       return;
     }
 
-    removeMemberAssignments(id, setReviewerFileAssignments);
-    if (selectedReviewerId === id) {
-      setSelectedReviewerId(null);
+    const tasksToDelete = projectTasks.filter(
+      (task) => task.assignedTo === memberId && task.assignedUserRole === role,
+    );
+
+    setUnassigningMemberId(memberId);
+    try {
+      await Promise.all(
+        tasksToDelete.map((task) => deleteProjectTask(task.id)),
+      );
+      if (id) {
+        await Promise.all([loadAssignmentsFromTasks(id), loadProjectFiles(id)]);
+      }
+      if (role === "annotator" && selectedAnnotatorId === memberId) {
+        setSelectedAnnotatorId(null);
+      } else if (role === "reviewer" && selectedReviewerId === memberId) {
+        setSelectedReviewerId(null);
+      }
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Failed to unassign member."));
+      throw err;
+    } finally {
+      setUnassigningMemberId(null);
     }
   };
 
@@ -1093,12 +1168,46 @@ export default function ManagerProjectEditPage() {
       toast.error("Unable to find file id for deletion.");
       return;
     }
+    setDeletingFileName(fileName);
     try {
       await deleteFile(idByName);
       await loadProjectFiles(id);
       toast.success("File deleted.");
     } catch (err) {
       toast.error(extractErrorMessage(err, "Failed to delete file."));
+      throw err;
+    } finally {
+      setDeletingFileName(null);
+    }
+  };
+
+  const handleChangeFileAssignee = async (
+    fileId: string,
+    role: "annotator" | "reviewer",
+    assigneeId: string,
+  ) => {
+    if (!id) {
+      toast.error("Missing project id.");
+      return;
+    }
+
+    const key = `${fileId}:${role}`;
+    setChangingFileAssigneeKey(key);
+    try {
+      if (role === "annotator") {
+        await updateFile(fileId, { annotatorId: assigneeId });
+      } else {
+        await updateFile(fileId, { reviewerId: assigneeId });
+      }
+      await loadProjectFiles(id);
+      toast.success(
+        `${role === "annotator" ? "Annotator" : "Reviewer"} updated.`,
+      );
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Failed to update assignee."));
+      throw err;
+    } finally {
+      setChangingFileAssigneeKey(null);
     }
   };
 
@@ -1387,19 +1496,13 @@ export default function ManagerProjectEditPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      "Delete this project? This action cannot be undone.",
-    );
-    if (!confirmed) {
-      return;
-    }
-
     try {
       await deleteProject(id);
       toast.success("Project deleted.");
       navigate("/manager/projects");
     } catch (err) {
       toast.error(extractErrorMessage(err, "Failed to delete project."));
+      throw err;
     }
   };
 
@@ -1483,6 +1586,7 @@ export default function ManagerProjectEditPage() {
             snapshots={projectSnapshots}
             loading={snapshotsLoading}
             creating={snapshotCreating}
+            canCreateSnapshot={hasApprovedFile}
             deletingSnapshotId={deletingSnapshotId}
             snapshotName={snapshotName}
             snapshotDescription={snapshotDescription}
@@ -1501,6 +1605,10 @@ export default function ManagerProjectEditPage() {
             projectFiles={projectFiles}
             assignedAnnotatorIds={assignedAnnotatorIds}
             assignedReviewerIds={assignedReviewerIds}
+            annotatorIdsWithApprovedFiles={annotatorIdsWithApprovedFiles}
+            reviewerIdsWithApprovedFiles={reviewerIdsWithApprovedFiles}
+            annotatorTaskAssigneeIds={annotatorTaskAssigneeIds}
+            reviewerTaskAssigneeIds={reviewerTaskAssigneeIds}
             configuredLabels={configuredLabels}
             annotatorFileAssignments={annotatorFileAssignments}
             reviewerFileAssignments={reviewerFileAssignments}
@@ -1530,7 +1638,13 @@ export default function ManagerProjectEditPage() {
               setIsSelectPresetOpen(true);
             }}
             onDeleteUploadedFile={handleDeleteUploadedFile}
-            onClearAssignedMember={handleClearAssignedMember}
+            deletingFileName={deletingFileName}
+            changingFileAssigneeKey={changingFileAssigneeKey}
+            onChangeFileAssignee={handleChangeFileAssignee}
+            onClearAssignedMember={(role, memberId) =>
+              void handleClearAssignedMember(role, memberId)
+            }
+            unassigningMemberId={unassigningMemberId}
             onRemoveConfiguredLabel={handleRemoveConfiguredLabel}
             onSaveLabelConfiguration={() =>
               void saveProjectConfigurationChanges()
@@ -1538,7 +1652,7 @@ export default function ManagerProjectEditPage() {
             onGuidelineTitleChange={setGuidelineTitle}
             onGuidelineFileChange={handleGuidelineFileChange}
             onSaveGuideline={() => void handleSaveGuideline()}
-            onDeleteProject={() => void handleDeleteProject()}
+            onDeleteProject={handleDeleteProject}
             onCancel={() => navigate("/manager/projects")}
             onCompleteProject={() => void handleCompleteProject()}
             isReadyToComplete={isReadyToComplete}

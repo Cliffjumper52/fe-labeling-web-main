@@ -12,8 +12,9 @@ const buildCreateProjectFormData = (
   formData.append("name", dto.name);
   if (dto.description) formData.append("description", dto.description);
   formData.append("dataType", dto.dataType);
-  dto.availableLabelIds.forEach((labelId) =>
-    formData.append("availableLabelIds", labelId),
+  formData.append(
+    "availableLabelIds",
+    JSON.stringify(dto.availableLabelIds ?? []),
   );
   if (image) formData.append("image", image);
   return formData;
@@ -76,6 +77,8 @@ export const getProjectsPaginated = async (filter: FilterProjectQueryDto) => {
     if (filter.order) queryParams.append("order", filter.order);
     if (filter.includeDeleted !== undefined)
       queryParams.append("includeDeleted", filter.includeDeleted.toString());
+    if (filter.createdById)
+      queryParams.append("createdById", filter.createdById);
     const resp = await api.get(`/projects?${queryParams.toString()}`);
     return resp.data;
   } catch (error) {
@@ -100,6 +103,21 @@ export const getProjectById = async (
 export const completeProject = async (dto: CompleteProjectDto) => {
   try {
     const resp = await api.post("/projects/manager/complete", dto);
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getProjectStatistics = async (createdById?: string) => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (createdById) queryParams.append("createdById", createdById);
+
+    const query = queryParams.toString();
+    const resp = await api.get(
+      `/projects/statistics${query ? `?${query}` : ""}`,
+    );
     return resp.data;
   } catch (error) {
     throw error;

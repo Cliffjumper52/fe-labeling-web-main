@@ -24,6 +24,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    const originalRequest = error.config as
+      | (typeof error.config & { _retry?: boolean })
+      | undefined;
+
     console.log("API Error:", {
       status: error.response?.status,
       statusText: error.response?.statusText,
@@ -33,15 +37,24 @@ api.interceptors.response.use(
       headers: error.config?.headers,
     });
 
-    if (error.response?.status === 401) {
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry
+    ) {
+      originalRequest._retry = true;
+
       try {
         const result = await refreshToken();
-        const resultData = result?.data;
+        const resultData =
+          (result as { data?: { accessToken?: string; refreshToken?: string } })
+            ?.data ??
+          (result as { accessToken?: string; refreshToken?: string });
         const newAccessToken = resultData?.accessToken;
         const newRefreshToken = resultData?.refreshToken;
 
         persistAuthTokens(newAccessToken, newRefreshToken);
-        return;
+        return api(originalRequest);
       } catch (_refreshError) {
         // Handle token refresh failure (e.g., redirect to login);
         clearAuthTokens();

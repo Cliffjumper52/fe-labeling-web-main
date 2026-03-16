@@ -12,7 +12,9 @@ import {
   fetchAdminAccounts,
   updateAdminAccount,
 } from "../../services/admin-service";
+import { getAccountStatistics } from "../../services/account-service.service";
 import { ConfirmButton } from "../../components/common/confirm-modal";
+import StatisticsSummary from "../../components/common/statistics-summary";
 
 type AdminUser = {
   id: string;
@@ -182,6 +184,21 @@ export default function AdminAccountsPage() {
           New User
         </button>
       </div>
+
+      <StatisticsSummary
+        className="mb-4"
+        fetchStatistics={() => getAccountStatistics(false)}
+        cards={[
+          { key: "totalAccounts", label: "Total accounts" },
+          { key: "adminCount", label: "Admins" },
+          { key: "managerCount", label: "Managers" },
+          { key: "annotatorCount", label: "Annotators" },
+          { key: "reviewerCount", label: "Reviewers" },
+          { key: "activeCount", label: "Active" },
+          { key: "inactiveCount", label: "Inactive" },
+          { key: "needChangePasswordCount", label: "Need change password" },
+        ]}
+      />
 
       <div className="mb-4 h-px w-full bg-gray-200" />
 
@@ -398,9 +415,8 @@ export default function AdminAccountsPage() {
                   value={newUserEmail}
                   onChange={(event) => setNewUserEmail(event.target.value)}
                   className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="name@gmail.com"
-                  pattern="^[^@\s]+@gmail\.com$"
-                  title="Enter a valid Gmail address (name@gmail.com)"
+                  placeholder="name@email.com"
+                  title="Enter a valid Email Accounts"
                   required
                 />
               </div>

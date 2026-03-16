@@ -17,6 +17,7 @@ import type { LabelChecklistQuestion } from "../../interface/label-checklist-que
 import {
   createLabel,
   deleteLabel,
+  getLabelStatistics,
   getLabelPaginated,
   updateLabel,
 } from "../../services/label-service.service";
@@ -27,7 +28,10 @@ import {
   updateLabelChecklistQuestion,
 } from "../../services/label-checklist-question-service.service";
 import { getAllCategories } from "../../services/label-category-service.service";
+import { ConfirmButton } from "../../components/common/confirm-modal";
 import Pagination from "../../components/common/pagination";
+import StatisticsSummary from "../../components/common/statistics-summary";
+import { useAuth } from "../../context/auth-context.context";
 
 type UiLabelCategory = {
   id: string;
@@ -108,6 +112,8 @@ export default function ManagerLabelsPage({
   initialLabels,
 }: ManagerLabelsPageProps) {
   const isAdmin = mode === "admin";
+  const { getUserInfo } = useAuth();
+  const user = getUserInfo();
 
   const [labels, setLabels] = useState<Label[]>(() => {
     return initialLabels ?? [];
@@ -119,6 +125,7 @@ export default function ManagerLabelsPage({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isCreateLabelOpen, setIsCreateLabelOpen] = useState(false);
+  const [creatingLabel, setCreatingLabel] = useState(false);
   const [labelName, setLabelName] = useState("");
   const [labelDescription, setLabelDescription] = useState("");
   const [labelColors, setLabelColors] = useState<string[]>([]);
@@ -129,6 +136,7 @@ export default function ManagerLabelsPage({
   );
   const [order, setOrder] = useState<"Ascending" | "Descending">("Descending");
   const [isEditLabelOpen, setIsEditLabelOpen] = useState(false);
+  const [updatingLabel, setUpdatingLabel] = useState(false);
   const [activeLabel, setActiveLabel] = useState<Label | null>(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -356,27 +364,6 @@ export default function ManagerLabelsPage({
     return sorted;
   }, [labels, order, orderBy, search]);
 
-  const labelStats = useMemo(() => {
-    return labels.reduce(
-      (acc, label) => {
-        acc.total += 1;
-        const questions = label.questions ?? [];
-        if (questions.length > 0) {
-          acc.withQuestions += 1;
-        }
-        for (const question of questions) {
-          if (question.role === "Annotator") {
-            acc.annotator += 1;
-          } else {
-            acc.reviewer += 1;
-          }
-        }
-        return acc;
-      },
-      { total: 0, withQuestions: 0, annotator: 0, reviewer: 0 },
-    );
-  }, [labels]);
-
   const resetCreateLabelForm = () => {
     setLabelName("");
     setLabelDescription("");
@@ -400,6 +387,7 @@ export default function ManagerLabelsPage({
     event.preventDefault();
 
     setLabelsError(null);
+    setCreatingLabel(true);
 
     try {
       const createColor = normalizeColor(labelColors[0] as unknown);
@@ -465,6 +453,8 @@ export default function ManagerLabelsPage({
       resetCreateLabelForm();
     } catch (error) {
       setLabelsError(extractErrorMessage(error, "Failed to create label."));
+    } finally {
+      setCreatingLabel(false);
     }
   };
 
@@ -478,19 +468,17 @@ export default function ManagerLabelsPage({
     setIsEditLabelOpen(true);
   };
 
-  const handleDeleteLabel = (labelId: string) => {
-    const removeLabel = async () => {
-      setLabelsError(null);
+  const handleDeleteLabel = async (labelId: string) => {
+    setLabelsError(null);
 
-      try {
-        await deleteLabel(labelId);
-        setLabels((prev) => prev.filter((label) => label.id !== labelId));
-      } catch (error) {
-        setLabelsError(extractErrorMessage(error, "Failed to delete label."));
-      }
-    };
-
-    void removeLabel();
+    try {
+      await deleteLabel(labelId);
+      setLabels((prev) => prev.filter((label) => label.id !== labelId));
+    } catch (error) {
+      const message = extractErrorMessage(error, "Failed to delete label.");
+      setLabelsError(message);
+      throw error;
+    }
   };
 
   const handleConfirmEdit = async () => {
@@ -499,6 +487,7 @@ export default function ManagerLabelsPage({
     }
 
     setLabelsError(null);
+    setUpdatingLabel(true);
 
     try {
       const updateColor = normalizeColor(editColors[0] as unknown);
@@ -579,6 +568,8 @@ export default function ManagerLabelsPage({
       closeWithAnimation("editLabel", setIsEditLabelOpen);
     } catch (error) {
       setLabelsError(extractErrorMessage(error, "Failed to update label."));
+    } finally {
+      setUpdatingLabel(false);
     }
   };
 
@@ -806,40 +797,15 @@ export default function ManagerLabelsPage({
 
         <div className="h-px w-full bg-gray-200" />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
-              Total labels
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">
-              {labelStats.total}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
-              With questions
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">
-              {labelStats.withQuestions}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
-              Annotator qs
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">
-              {labelStats.annotator}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
-              Reviewer qs
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">
-              {labelStats.reviewer}
-            </p>
-          </div>
-        </div>
+        <StatisticsSummary
+          fetchStatistics={() => getLabelStatistics(undefined)}
+          cards={[
+            { key: "totalLabels", label: "Total labels" },
+            { key: "labelsWithQuestions", label: "With questions" },
+            { key: "annotatorQuestions", label: "Annotator qs" },
+            { key: "reviewerQuestions", label: "Reviewer qs" },
+          ]}
+        />
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr_1fr]">
           <div className="flex flex-col gap-2">
@@ -865,7 +831,6 @@ export default function ManagerLabelsPage({
               />
             </div>
           </div>
-
           <div className="flex flex-col gap-2">
             <label className="text-sm font-semibold text-gray-700">
               Order by
@@ -884,9 +849,7 @@ export default function ManagerLabelsPage({
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-gray-700">
-              Order
-            </label>
+            <label className="text-sm font-semibold text-gray-700">Order</label>
             <select
               title="Sort order"
               value={order}
@@ -980,9 +943,7 @@ export default function ManagerLabelsPage({
                 <div>
                   <div className="flex w-full flex-col items-start gap-2">
                     {(label.categories ?? []).length === 0 ? (
-                      <span className="text-xs text-gray-400">
-                        No category
-                      </span>
+                      <span className="text-xs text-gray-400">No category</span>
                     ) : (
                       (label.categories ?? []).map((category) => (
                         <span
@@ -1023,12 +984,8 @@ export default function ManagerLabelsPage({
                     )}
                   </div>
                 </div>
-                <span className="text-sm text-gray-600">
-                  {label.createdAt}
-                </span>
-                <span className="text-sm text-gray-600">
-                  {label.updatedAt}
-                </span>
+                <span className="text-sm text-gray-600">{label.createdAt}</span>
+                <span className="text-sm text-gray-600">{label.updatedAt}</span>
                 <div className="flex items-center gap-3 text-sm font-semibold">
                   <Link
                     to={`/manager/labels/${label.id}`}
@@ -1037,13 +994,16 @@ export default function ManagerLabelsPage({
                     Details
                   </Link>
                   {isAdmin ? (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteLabel(label.id)}
-                      className="text-red-500 hover:text-red-600"
-                    >
-                      Delete
-                    </button>
+                    <ConfirmButton
+                      label="Delete"
+                      variant="danger"
+                      size="sm"
+                      className="!h-auto !border-0 !bg-transparent !p-0 text-red-500 hover:text-red-600 hover:!bg-transparent"
+                      modalHeader="Delete this label?"
+                      modalBody={`Are you sure you want to delete ${label.name}? This action cannot be undone.`}
+                      confirmLabel="Delete"
+                      onConfirm={() => handleDeleteLabel(label.id)}
+                    />
                   ) : (
                     <>
                       <button
@@ -1053,13 +1013,16 @@ export default function ManagerLabelsPage({
                       >
                         Edit
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteLabel(label.id)}
-                        className="text-red-500 hover:text-red-600"
-                      >
-                        Delete
-                      </button>
+                      <ConfirmButton
+                        label="Delete"
+                        variant="danger"
+                        size="sm"
+                        className="!h-auto !border-0 !bg-transparent !p-0 text-red-500 hover:text-red-600 hover:!bg-transparent"
+                        modalHeader="Delete this label?"
+                        modalBody={`Are you sure you want to delete ${label.name}? This action cannot be undone.`}
+                        confirmLabel="Delete"
+                        onConfirm={() => handleDeleteLabel(label.id)}
+                      />
                     </>
                   )}
                 </div>
@@ -1098,11 +1061,12 @@ export default function ManagerLabelsPage({
                 </h3>
                 <button
                   type="button"
+                  disabled={creatingLabel}
                   onClick={() => {
                     closeWithAnimation("createLabel", setIsCreateLabelOpen);
                     resetCreateLabelForm();
                   }}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-500 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
                   aria-label="Close"
                 >
                   <svg
@@ -1406,20 +1370,28 @@ export default function ManagerLabelsPage({
                 <div className="flex justify-end gap-2 pt-1">
                   <button
                     type="button"
+                    disabled={creatingLabel}
                     onClick={() => {
                       closeWithAnimation("createLabel", setIsCreateLabelOpen);
                       resetCreateLabelForm();
                     }}
-                    className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+                    disabled={creatingLabel}
+                    className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <span className="text-base leading-none">+</span>
-                    Create label
+                    {creatingLabel ? (
+                      "Creating..."
+                    ) : (
+                      <>
+                        <span className="text-base leading-none">+</span>
+                        Create label
+                      </>
+                    )}
                   </button>
                 </div>
               </form>
@@ -1440,10 +1412,11 @@ export default function ManagerLabelsPage({
                 </h3>
                 <button
                   type="button"
+                  disabled={updatingLabel}
                   onClick={() =>
                     closeWithAnimation("editLabel", setIsEditLabelOpen)
                   }
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-500 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
                   aria-label="Close"
                 >
                   ✕
@@ -1722,19 +1695,21 @@ export default function ManagerLabelsPage({
                 <div className="flex flex-wrap justify-end gap-2">
                   <button
                     type="button"
+                    disabled={updatingLabel}
                     onClick={() =>
                       closeWithAnimation("editLabel", setIsEditLabelOpen)
                     }
-                    className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
+                    disabled={updatingLabel}
                     onClick={handleConfirmEdit}
-                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
+                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Confirm
+                    {updatingLabel ? "Updating..." : "Confirm"}
                   </button>
                 </div>
               </div>

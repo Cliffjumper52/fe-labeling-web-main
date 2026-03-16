@@ -107,3 +107,19 @@ export const restoreAccount = async (id: string) => {
     throw error;
   }
 };
+
+export const getAccountStatistics = async (includeDeleted: boolean = false) => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (includeDeleted)
+      queryParams.append("includeDeleted", includeDeleted.toString());
+
+    const query = queryParams.toString();
+    const resp = await api.get(
+      `/accounts/statistics${query ? `?${query}` : ""}`,
+    );
+    return resp;
+  } catch (error) {
+    throw error;
+  }
+};

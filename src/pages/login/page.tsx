@@ -4,21 +4,35 @@ import LoginForm from "../../components/login/login-form";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/auth-context.context";
+import {
+  getRememberMePreference,
+  getRememberedLoginIdentifier,
+  setRememberedLoginIdentifier,
+} from "../../utils/auth-storage";
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { setAuthTokens, setUserInfo, getUserInfo } = useAuth();
+  const rememberedPreference = getRememberMePreference();
+  const rememberedLoginIdentifier = getRememberedLoginIdentifier();
 
-  const handleLogin = async (email: string, password: string) => {
+  const handleLogin = async (
+    email: string,
+    password: string,
+    rememberMe: boolean,
+  ) => {
     // console.log(email, password);
     setIsLoading(true);
     try {
       const result = await login(email, password);
       const accessToken = result?.data?.accessToken;
       const refreshToken = result?.data?.refreshToken;
+      const loginIdentifier =
+        result?.data?.user?.email ?? result?.data?.user?.username ?? email;
 
-      setAuthTokens(accessToken, refreshToken);
-      await setUserInfo();
+      setAuthTokens(accessToken, refreshToken, { rememberMe });
+      setRememberedLoginIdentifier(loginIdentifier, rememberMe);
+      await setUserInfo(rememberMe);
 
       const userInfo = getUserInfo();
       const role = userInfo?.role;
@@ -40,6 +54,10 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleForgotPassword = () => {
+    navigate("/forgot-password");
   };
 
   return (
@@ -98,7 +116,15 @@ export default function LoginPage() {
                 <h3>Welcome back</h3>
                 <p>Sign in to continue to your assigned workspace.</p>
               </div>
-              <LoginForm onLogin={handleLogin} isLoading={isLoading} />
+              <LoginForm
+                onLogin={handleLogin}
+                isLoading={isLoading}
+                initialEmail={
+                  rememberedPreference ? rememberedLoginIdentifier : ""
+                }
+                initialRememberMe={rememberedPreference}
+                handleForgotPassword={handleForgotPassword}
+              />
 
               <div className="login-demo-hint">
                 Demo: admin@gmail.com / manager@gmail.com / annotator@gmail.com

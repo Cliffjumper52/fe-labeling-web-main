@@ -1,6 +1,8 @@
 import api from "../api/axios";
 import type { AnswerDataDto } from "../interface/checklist-answer/dtos/answer-data/answer-data.dto";
 import type { Decision } from "../interface/enums/domain.enums";
+import type { ApiResponse } from "../interface/common/api-response.interface";
+import type { Review } from "../interface/review/review.interface";
 
 export interface ReviewFilterQueryDto {
   page?: number;
@@ -44,6 +46,22 @@ export interface ReviewerAggregationStats {
   approvalRate: number;
   scoreImpact: number;
 }
+
+type PaginatedResult<T> = {
+  data?: T[];
+};
+
+const unwrapApiResponse = <T>(payload: unknown): T | null => {
+  if (!payload || typeof payload !== "object") {
+    return payload as T;
+  }
+
+  if ("data" in payload) {
+    return (payload as ApiResponse<T>).data;
+  }
+
+  return payload as T;
+};
 
 export const updateReview = async (id: string, dto: UpdateReviewDto) => {
   try {
@@ -133,6 +151,38 @@ export const getReviewById = async (
       `/reviews/${id}?includeDeleted=${includeDeleted}`,
     );
     return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getReviewByChecklistAnswerId = async (
+  checklistAnswerId: string,
+  includeDeleted: boolean = false,
+): Promise<Review | null> => {
+  try {
+    const response = await getAllReviews(
+      {
+        checklistAnswerId,
+        orderBy: "createdAt",
+        order: "DESC",
+      },
+      includeDeleted,
+    );
+
+    const payload = unwrapApiResponse<PaginatedResult<Review> | Review[]>(
+      response,
+    );
+
+    if (Array.isArray(payload)) {
+      return payload[0] ?? null;
+    }
+
+    if (payload && typeof payload === "object" && Array.isArray(payload.data)) {
+      return payload.data[0] ?? null;
+    }
+
+    return null;
   } catch (error) {
     throw error;
   }

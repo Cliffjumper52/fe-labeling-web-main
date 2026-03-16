@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   deleteLabel,
+  getLabelStatistics,
   getLabelPaginated,
 } from "../../services/label-service.service";
 import { ConfirmButton } from "../../components/common/confirm-modal";
+import StatisticsSummary from "../../components/common/statistics-summary";
 
 type ApiEnvelope<T> = { data?: T; message?: string | string[] };
 type PaginatedPayload<T> = {
@@ -89,6 +91,17 @@ export default function AdminLabelsPage() {
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold text-gray-800">Labels</h2>
       </div>
+
+      <StatisticsSummary
+        className="mb-4"
+        fetchStatistics={getLabelStatistics}
+        cards={[
+          { key: "totalLabels", label: "Total labels" },
+          { key: "labelsWithQuestions", label: "With questions" },
+          { key: "annotatorQuestions", label: "Annotator qs" },
+          { key: "reviewerQuestions", label: "Reviewer qs" },
+        ]}
+      />
 
       <div className="mb-4 flex gap-2">
         <input

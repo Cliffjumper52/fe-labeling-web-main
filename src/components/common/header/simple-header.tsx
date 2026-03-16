@@ -37,6 +37,17 @@ export default function SimpleHeader() {
     navigate("/login");
   };
 
+  const handleOpenDetail = () => {
+    setIsProfileOpen(false);
+    const roleFromUser = getUserInfo()?.role;
+    const roleFromPath = location.pathname.split("/")[1];
+    const roleSegment = roleFromUser || roleFromPath;
+
+    if (roleSegment) {
+      navigate(`/${roleSegment}/detail`);
+    }
+  };
+
   return (
     <header className="app-header text-white">
       <div className="app-header__inner">
@@ -92,6 +103,7 @@ export default function SimpleHeader() {
                   type="button"
                   className="w-full rounded-lg px-3 py-2 text-left hover:bg-white/10"
                   role="menuitem"
+                  onClick={handleOpenDetail}
                 >
                   Detail
                 </button>

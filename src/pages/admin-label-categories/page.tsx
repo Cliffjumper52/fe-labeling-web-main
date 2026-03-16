@@ -1,18 +1,14 @@
-import {
-  useEffect,
-  useState,
-  type Dispatch,
-  type FormEvent,
-  type SetStateAction,
-} from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import {
   createLabelCategory,
   deleteCategory,
+  getLabelCategoryStatistics,
   getLabelCategoriesPaginated,
   updateLabelCategory,
 } from "../../services/label-category-service.service";
 import { ConfirmButton } from "../../components/common/confirm-modal";
+import StatisticsSummary from "../../components/common/statistics-summary";
 
 type ApiEnvelope<T> = { data?: T; message?: string | string[] };
 type PaginatedPayload<T> = {
@@ -45,6 +41,15 @@ const normalize = <T,>(raw: unknown): PaginatedPayload<T> => {
     totalPages: env?.data?.totalPages,
     currentPage: env?.data?.currentPage,
   };
+};
+
+const formatAverage = (value: number | string | null | undefined): string => {
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return "-";
+  }
+
+  return numericValue.toFixed(2);
 };
 
 export default function AdminLabelCategoriesPage() {
@@ -195,6 +200,25 @@ export default function AdminLabelCategoriesPage() {
           New Category
         </button>
       </div>
+
+      <StatisticsSummary
+        className="mb-4"
+        fetchStatistics={getLabelCategoryStatistics}
+        cards={[
+          { key: "totalCategories", label: "Total categories" },
+          { key: "categoriesWithLabels", label: "With labels" },
+          {
+            key: "avgLabelsPerCategory",
+            label: "Avg labels/category",
+            formatValue: formatAverage,
+          },
+          {
+            key: "avgCategoriesPerLabel",
+            label: "Avg categories/label",
+            formatValue: formatAverage,
+          },
+        ]}
+      />
 
       <div className="mb-4 flex gap-2">
         <input
