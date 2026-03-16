@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/auth-context.context";
+import NotificationPanel from "../notification/notification-panel";
 
 export default function SimpleHeader() {
   const navigate = useNavigate();
@@ -52,22 +53,7 @@ export default function SimpleHeader() {
 
         <div className="flex items-center gap-3">
           <span className="header-pill">{todayLabel}</span>
-          <button
-            type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 hover:bg-white/20"
-            aria-label="Notifications"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7" />
-              <path d="M10 21a2 2 0 0 0 4 0" />
-            </svg>
-          </button>
+          <NotificationPanel />
 
           <div className="relative">
             <button
