@@ -59,6 +59,14 @@ const formatDateTime = (value: string) => {
   });
 };
 
+const calculateScore = (totalPenalty: number, totalLabelsAssigned: number) => {
+  if (totalLabelsAssigned <= 0) {
+    return 100;
+  }
+
+  return 100 - totalPenalty / totalLabelsAssigned;
+};
+
 type ReviewErrorBreakdownItem = {
   name: string;
   count: number;
@@ -315,9 +323,15 @@ export default function Page() {
       </div>
 
       {selectedRating && selectedProject && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 px-4">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-gray-300 bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b px-4 py-3">
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 px-4"
+          onClick={closeDetail}
+        >
+          <div
+            className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border border-gray-300 bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
               <h2 className="text-lg font-semibold text-gray-800">
                 Rating detail
               </h2>
@@ -331,136 +345,170 @@ export default function Page() {
               </button>
             </div>
 
-            <div className="space-y-4 p-4">
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <p className="text-sm font-semibold text-gray-800">
-                  Project info
-                </p>
-                <div className="mt-2 flex items-center gap-3">
-                  <div className="h-16 w-16 overflow-hidden rounded-md border border-gray-200 bg-gray-100">
-                    {selectedProject.imageUrl ? (
-                      <img
-                        src={selectedProject.imageUrl}
-                        alt={selectedProject.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-[10px] text-gray-400">
-                        No image
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {selectedProject.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Project ID: {selectedProject.id}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <p className="text-sm font-semibold text-gray-800">
-                  Account rating
-                </p>
-                <div className="mt-2 grid grid-cols-1 gap-2 text-sm text-gray-700 sm:grid-cols-2">
-                  <span>Score: {selectedRating.ratingScore}</span>
-                  <span>Files labeled: {selectedRating.totalFileLabeled}</span>
-                  <span>Error count: {selectedRating.errorCount}</span>
-                  <span>
-                    Updated: {formatDateTime(selectedRating.updatedAt)}
-                  </span>
-                </div>
-                {selectedRating.feedbacks && (
-                  <p className="mt-2 text-sm text-gray-600">
-                    Feedback: {selectedRating.feedbacks}
+            <div className="overflow-y-auto">
+              <div className="space-y-4 p-4">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-sm font-semibold text-gray-800">
+                    Project info
                   </p>
-                )}
-              </div>
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <p className="text-sm font-semibold text-gray-800">
-                  History stacks
-                </p>
-                {historiesLoading ? (
-                  <p className="mt-2 text-sm text-gray-500">
-                    Loading history...
-                  </p>
-                ) : historiesError ? (
-                  <p className="mt-2 text-sm text-rose-600">{historiesError}</p>
-                ) : histories.length === 0 ? (
-                  <p className="mt-2 text-sm text-gray-500">
-                    No history records.
-                  </p>
-                ) : (
-                  <div className="mt-2 space-y-2">
-                    {histories.map((history) => (
-                      <div
-                        key={history.id}
-                        className="rounded-md border border-gray-200 bg-white px-3 py-2"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
-                          <span>{formatDateTime(history.changedAt)}</span>
-                          <span>
-                            {history.previousRatingScore} →{" "}
-                            {history.newRatingScore}
-                          </span>
+                  <div className="mt-2 flex items-center gap-3">
+                    <div className="h-16 w-16 overflow-hidden rounded-md border border-gray-200 bg-gray-100">
+                      {selectedProject.imageUrl ? (
+                        <img
+                          src={selectedProject.imageUrl}
+                          alt={selectedProject.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[10px] text-gray-400">
+                          No image
                         </div>
-                        <p className="mt-1 text-sm text-gray-700">
-                          {history.changeReason || "No reason provided"}
-                        </p>
-                        {(() => {
-                          const reviewError = parseReviewError(
-                            history.reviewError,
-                          );
-                          if (!reviewError) {
-                            return null;
-                          }
-
-                          return (
-                            <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-2">
-                              <p className="text-xs font-semibold text-gray-700">
-                                Review error summary
-                              </p>
-                              <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-gray-600">
-                                <span>
-                                  Files: {reviewError.totalFileLabeled}
-                                </span>
-                                <span>Errors: {reviewError.errorCount}</span>
-                                <span>Penalty: {reviewError.totalPenalty}</span>
-                              </div>
-                              {reviewError.breakdown.length > 0 && (
-                                <div className="mt-2 space-y-1">
-                                  {reviewError.breakdown.map((item, index) => (
-                                    <div
-                                      key={`${history.id}-breakdown-${index}`}
-                                      className="rounded border border-gray-200 bg-white px-2 py-1"
-                                    >
-                                      <p className="text-xs font-semibold text-gray-700">
-                                        {item.name} ({item.severity})
-                                      </p>
-                                      <p className="text-[11px] text-gray-600">
-                                        Count: {item.count} • Impact:{" "}
-                                        {item.totalImpact}
-                                      </p>
-                                      {item.description && (
-                                        <p className="text-[11px] text-gray-500">
-                                          {item.description}
-                                        </p>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    ))}
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {selectedProject.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Project ID: {selectedProject.id}
+                      </p>
+                    </div>
                   </div>
-                )}
+                </div>
+
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-sm font-semibold text-gray-800">
+                    Account rating
+                  </p>
+                  <div className="mt-2 grid grid-cols-1 gap-2 text-sm text-gray-700 sm:grid-cols-2">
+                    <span>Score: {selectedRating.ratingScore}</span>
+                    <span>
+                      Files labeled: {selectedRating.totalFileLabeled}
+                    </span>
+                    <span>Error count: {selectedRating.errorCount}</span>
+                    <span>
+                      Updated: {formatDateTime(selectedRating.updatedAt)}
+                    </span>
+                  </div>
+                  {selectedRating.feedbacks && (
+                    <p className="mt-2 text-sm text-gray-600">
+                      Feedback: {selectedRating.feedbacks}
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+                  <p className="text-sm font-semibold text-blue-800">
+                    Scoring method
+                  </p>
+                  <p className="mt-1 text-xs text-blue-700">
+                    <span className="font-mono font-semibold">
+                      Score = 100 &minus; (Total Penalty / Total Labels
+                      Assigned)
+                    </span>
+                  </p>
+                  <p className="mt-2 text-[11px] text-blue-600">
+                    The final score subtracts average penalty per assigned
+                    label. If assigned labels is 0, score defaults to 100.
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-sm font-semibold text-gray-800">
+                    History stacks
+                  </p>
+                  {historiesLoading ? (
+                    <p className="mt-2 text-sm text-gray-500">
+                      Loading history...
+                    </p>
+                  ) : historiesError ? (
+                    <p className="mt-2 text-sm text-rose-600">
+                      {historiesError}
+                    </p>
+                  ) : histories.length === 0 ? (
+                    <p className="mt-2 text-sm text-gray-500">
+                      No history records.
+                    </p>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      {histories.map((history) => (
+                        <div
+                          key={history.id}
+                          className="rounded-md border border-gray-200 bg-white px-3 py-2"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+                            <span>{formatDateTime(history.changedAt)}</span>
+                            <span>
+                              {history.previousRatingScore} →{" "}
+                              {history.newRatingScore}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-sm text-gray-700">
+                            {history.changeReason || "No reason provided"}
+                          </p>
+                          {(() => {
+                            const reviewError = parseReviewError(
+                              history.reviewError,
+                            );
+                            if (!reviewError) {
+                              return null;
+                            }
+
+                            return (
+                              <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-2">
+                                <p className="text-xs font-semibold text-gray-700">
+                                  Review error summary
+                                </p>
+                                <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-gray-600">
+                                  <span>
+                                    Files: {reviewError.totalFileLabeled}
+                                  </span>
+                                  <span>Errors: {reviewError.errorCount}</span>
+                                  <span>
+                                    Penalty: {reviewError.totalPenalty}
+                                  </span>
+                                </div>
+                                <p className="mt-1 font-mono text-[11px] text-gray-500">
+                                  100 &minus; ({reviewError.totalPenalty} /{" "}
+                                  {reviewError.totalFileLabeled}) ={" "}
+                                  {calculateScore(
+                                    reviewError.totalPenalty,
+                                    reviewError.totalFileLabeled,
+                                  ).toFixed(2)}
+                                </p>
+                                {reviewError.breakdown.length > 0 && (
+                                  <div className="mt-2 space-y-1">
+                                    {reviewError.breakdown.map(
+                                      (item, index) => (
+                                        <div
+                                          key={`${history.id}-breakdown-${index}`}
+                                          className="rounded border border-gray-200 bg-white px-2 py-1"
+                                        >
+                                          <p className="text-xs font-semibold text-gray-700">
+                                            {item.name} ({item.severity})
+                                          </p>
+                                          <p className="text-[11px] text-gray-600">
+                                            Count: {item.count} • Impact:{" "}
+                                            {item.totalImpact}
+                                          </p>
+                                          {item.description && (
+                                            <p className="text-[11px] text-gray-500">
+                                              {item.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                      ),
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

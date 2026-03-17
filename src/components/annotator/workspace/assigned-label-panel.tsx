@@ -347,7 +347,7 @@ export default function AssignedLabelsPanel({
 
         {!canSubmitFileForReview && selectedFile ? (
           <p className="mt-1 text-[11px] text-gray-500">
-            Available when file status is in annotation or requires fix.
+            Add at least 1 label to this file before submitting for review.
           </p>
         ) : null}
       </div>

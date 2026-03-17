@@ -2,9 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "../../context/auth-context.context";
-import { getInfoByToken, updatePassword } from "../../services/auth-service";
-import { updateAccount } from "../../services/account-service.service";
 import type { Account } from "../../interface";
+import { updateAccount } from "../../services/account-service.service";
+import { getInfoByToken, updatePassword } from "../../services/auth-service";
+import AccountHeader from "../../components/common/account-detail/account-header";
+import PasswordCard from "../../components/common/account-detail/password-card";
+import ProfileCard from "../../components/common/account-detail/profile-card";
 
 export default function AccountDetailPage() {
   const navigate = useNavigate();
@@ -143,221 +146,46 @@ export default function AccountDetailPage() {
     }
   };
 
-  const EyeIcon = ({ isVisible }: { isVisible: boolean }) => (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      {isVisible ? (
-        <>
-          <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" />
-          <circle cx="12" cy="12" r="3" />
-        </>
-      ) : (
-        <>
-          <path d="M3 3l18 18" />
-          <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
-          <path d="M9.9 5.1a9 9 0 0 1 10.1 6.9 9.3 9.3 0 0 1-3 4.3" />
-          <path d="M6.1 6.1A9.3 9.3 0 0 0 2 12s3.5 6 10 6a9.8 9.8 0 0 0 4.4-1" />
-        </>
-      )}
-    </svg>
-  );
+  const roleBadgeClassName = getRoleBadgeClassName(profile?.role);
+  const roleLabel = profile?.role ? formatRoleLabel(profile.role) : "Unknown";
 
   return (
     <section className="mx-auto w-full max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">
-            Account details
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Review profile information and update your password.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => navigate(roleHomePath)}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-        >
-          Back
-        </button>
-      </div>
+      <AccountHeader onBack={() => navigate(roleHomePath)} />
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <div className="text-xs uppercase tracking-wide text-slate-500">
-              Active role
-            </div>
-            <div
-              className={`mt-1 inline-flex items-center rounded-full border px-3 py-1 text-sm font-semibold ${getRoleBadgeClassName(
-                profile?.role,
-              )}`}
-            >
-              {profile?.role ? formatRoleLabel(profile.role) : "Unknown"}
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-xs uppercase tracking-wide text-slate-500">
-              Account status
-            </div>
-            <div className="mt-1 text-sm font-medium text-slate-900">
-              {profile?.status ?? "-"}
-            </div>
-          </div>
-        </div>
+      <ProfileCard
+        profile={profile}
+        username={username}
+        onUsernameChange={setUsername}
+        onSaveUsername={handleUpdateUsername}
+        isLoadingProfile={isLoadingProfile}
+        isUpdatingProfile={isUpdatingProfile}
+        roleBadgeClassName={roleBadgeClassName}
+        roleLabel={roleLabel}
+      />
 
-        {isLoadingProfile ? (
-          <div className="text-sm text-slate-600">Loading profile...</div>
-        ) : (
-          <div className="grid gap-3 text-sm md:grid-cols-2">
-            <div>
-              <div className="text-slate-500">Username</div>
-              <input
-                type="text"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="Your username"
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-              />
-            </div>
-            <div>
-              <div className="text-slate-500">Email</div>
-              <div className="font-medium text-slate-900">
-                {profile?.email ?? "-"}
-              </div>
-            </div>
-            <div>
-              <div className="text-slate-500">Role key</div>
-              <div className="font-medium uppercase tracking-wide text-slate-900">
-                {profile?.role ?? "-"}
-              </div>
-            </div>
-            <div>
-              <div className="text-slate-500">Account ID</div>
-              <div className="truncate font-medium text-slate-900">
-                {profile?.id ?? "-"}
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={() => {
-              void handleUpdateUsername();
-            }}
-            disabled={isUpdatingProfile || isLoadingProfile}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isUpdatingProfile ? "Saving..." : "Save username"}
-          </button>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Update password
-          </h2>
-          <button
-            type="button"
-            onClick={() => setShowPasswordForm((prev) => !prev)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            {showPasswordForm ? "Hide form" : "Change password"}
-          </button>
-        </div>
-
-        {showPasswordForm && (
-          <>
-            <div className="mt-4 space-y-3">
-              <div className="relative">
-                <input
-                  type={showCurrentPassword ? "text" : "password"}
-                  value={currentPassword}
-                  onChange={(event) => setCurrentPassword(event.target.value)}
-                  placeholder="Current password"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 pr-10 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowCurrentPassword((prev) => !prev)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-600 hover:bg-slate-100"
-                  aria-label={
-                    showCurrentPassword
-                      ? "Hide current password"
-                      : "Show current password"
-                  }
-                >
-                  <EyeIcon isVisible={showCurrentPassword} />
-                </button>
-              </div>
-
-              <div className="relative">
-                <input
-                  type={showNewPassword ? "text" : "password"}
-                  value={newPassword}
-                  onChange={(event) => setNewPassword(event.target.value)}
-                  placeholder="New password"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 pr-10 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPassword((prev) => !prev)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-600 hover:bg-slate-100"
-                  aria-label={
-                    showNewPassword ? "Hide new password" : "Show new password"
-                  }
-                >
-                  <EyeIcon isVisible={showNewPassword} />
-                </button>
-              </div>
-
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  placeholder="Confirm new password"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 pr-10 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword((prev) => !prev)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-600 hover:bg-slate-100"
-                  aria-label={
-                    showConfirmPassword
-                      ? "Hide confirm password"
-                      : "Show confirm password"
-                  }
-                >
-                  <EyeIcon isVisible={showConfirmPassword} />
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  void handleUpdatePassword();
-                }}
-                disabled={isUpdatingPassword}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isUpdatingPassword ? "Updating..." : "Update password"}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+      <PasswordCard
+        showPasswordForm={showPasswordForm}
+        onTogglePasswordForm={() => setShowPasswordForm((prev) => !prev)}
+        currentPassword={currentPassword}
+        onCurrentPasswordChange={setCurrentPassword}
+        newPassword={newPassword}
+        onNewPasswordChange={setNewPassword}
+        confirmPassword={confirmPassword}
+        onConfirmPasswordChange={setConfirmPassword}
+        showCurrentPassword={showCurrentPassword}
+        onToggleShowCurrentPassword={() =>
+          setShowCurrentPassword((prev) => !prev)
+        }
+        showNewPassword={showNewPassword}
+        onToggleShowNewPassword={() => setShowNewPassword((prev) => !prev)}
+        showConfirmPassword={showConfirmPassword}
+        onToggleShowConfirmPassword={() =>
+          setShowConfirmPassword((prev) => !prev)
+        }
+        isUpdatingPassword={isUpdatingPassword}
+        onUpdatePassword={handleUpdatePassword}
+      />
     </section>
   );
 }

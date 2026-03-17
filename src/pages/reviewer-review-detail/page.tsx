@@ -22,19 +22,55 @@ const extractReview = (payload: unknown): Review | null => {
 type NormalizedReviewError = {
   id: string;
   reviewErrorTypeId?: string;
+  reviewErrorTypeName?: string;
+  reviewErrorTypeDescription?: string | null;
+  reviewErrorTypeSeverity?: string;
+  reviewErrorTypeScoreImpact?: number;
   description?: string | null;
   errorLocation?: Record<string, unknown> | null;
+};
+
+type FileLabelContext = {
+  fileName?: string;
+  fileUrl?: string;
+  fileStatus?: string;
+  labelName?: string;
+  labelDescription?: string;
+  labelColor?: string;
 };
 
 const normalizeReviewError = (
   item: ReviewError | EntityReference,
 ): NormalizedReviewError => {
   const full = item as Partial<ReviewError>;
+  const errorType = full.reviewErrorType as
+    | {
+        id?: unknown;
+        name?: unknown;
+        description?: unknown;
+        severity?: unknown;
+        scoreImpact?: unknown;
+      }
+    | undefined;
+
   return {
     id: item.id,
     reviewErrorTypeId:
       typeof full.reviewErrorTypeId === "string"
         ? full.reviewErrorTypeId
+        : undefined,
+    reviewErrorTypeName:
+      typeof errorType?.name === "string" ? errorType.name : undefined,
+    reviewErrorTypeDescription:
+      typeof errorType?.description === "string" ||
+      errorType?.description === null
+        ? errorType.description
+        : undefined,
+    reviewErrorTypeSeverity:
+      typeof errorType?.severity === "string" ? errorType.severity : undefined,
+    reviewErrorTypeScoreImpact:
+      typeof errorType?.scoreImpact === "number"
+        ? errorType.scoreImpact
         : undefined,
     description:
       typeof full.description === "string" || full.description === null
@@ -58,6 +94,62 @@ const mapDecisionBadge = (decision: Review["decision"]): string => {
   if (decision === "approved") return "bg-emerald-100 text-emerald-700";
   if (decision === "rejected") return "bg-rose-100 text-rose-700";
   return "bg-amber-100 text-amber-700";
+};
+
+const mapSeverityBadge = (severity?: string): string => {
+  if (severity === "critical") return "bg-rose-100 text-rose-700";
+  if (severity === "high") return "bg-orange-100 text-orange-700";
+  if (severity === "moderate") return "bg-amber-100 text-amber-700";
+  if (severity === "low") return "bg-blue-100 text-blue-700";
+  return "bg-gray-100 text-gray-700";
+};
+
+const extractFileLabelContext = (review: Review): FileLabelContext | null => {
+  const fileLabel = review.fileLabel as
+    | {
+        file?: {
+          fileName?: unknown;
+          fileUrl?: unknown;
+          status?: unknown;
+        };
+        label?: {
+          name?: unknown;
+          description?: unknown;
+          color?: unknown;
+        };
+      }
+    | undefined;
+
+  if (!fileLabel || typeof fileLabel !== "object") {
+    return null;
+  }
+
+  return {
+    fileName:
+      typeof fileLabel.file?.fileName === "string"
+        ? fileLabel.file.fileName
+        : undefined,
+    fileUrl:
+      typeof fileLabel.file?.fileUrl === "string"
+        ? fileLabel.file.fileUrl
+        : undefined,
+    fileStatus:
+      typeof fileLabel.file?.status === "string"
+        ? fileLabel.file.status
+        : undefined,
+    labelName:
+      typeof fileLabel.label?.name === "string"
+        ? fileLabel.label.name
+        : undefined,
+    labelDescription:
+      typeof fileLabel.label?.description === "string"
+        ? fileLabel.label.description
+        : undefined,
+    labelColor:
+      typeof fileLabel.label?.color === "string"
+        ? fileLabel.label.color
+        : undefined,
+  };
 };
 
 export default function Page() {
@@ -126,6 +218,14 @@ export default function Page() {
       .map(normalizeReviewError);
   }, [review?.reviewErrors]);
 
+  const fileLabelContext = useMemo(() => {
+    if (!review) {
+      return null;
+    }
+
+    return extractFileLabelContext(review);
+  }, [review]);
+
   return (
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-5 flex items-center justify-between gap-3">
@@ -167,14 +267,51 @@ export default function Page() {
               </span>
             </div>
 
+            <div className="mb-4 rounded-md border border-gray-100 bg-gray-50 p-3">
+              <p className="mb-2 text-sm font-semibold text-gray-800">
+                Labeled file
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="h-16 w-16 overflow-hidden rounded-md border border-gray-200 bg-gray-100">
+                  {fileLabelContext?.fileUrl ? (
+                    <img
+                      src={fileLabelContext.fileUrl}
+                      alt={fileLabelContext.fileName ?? "File preview"}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-[10px] text-gray-400">
+                      No image
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-900">
+                    {fileLabelContext?.fileName ?? "--"}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                    <span className="rounded-md border border-gray-200 bg-white px-2 py-1 text-gray-700">
+                      Status: {fileLabelContext?.fileStatus ?? "--"}
+                    </span>
+                    <span
+                      className="rounded-md border px-2 py-1"
+                      style={{
+                        borderColor: fileLabelContext?.labelColor ?? "#d1d5db",
+                        color: fileLabelContext?.labelColor ?? "#374151",
+                        backgroundColor: "#ffffff",
+                      }}
+                    >
+                      Label: {fileLabelContext?.labelName ?? "--"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {fileLabelContext?.labelDescription ?? "--"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 gap-3 text-sm text-gray-700 md:grid-cols-2">
-              <p>
-                <span className="font-semibold">Review ID:</span> {review.id}
-              </p>
-              <p>
-                <span className="font-semibold">File Label ID:</span>{" "}
-                {review.fileLabelId}
-              </p>
               <p>
                 <span className="font-semibold">Reviewer ID:</span>{" "}
                 {review.reviewerId}
@@ -217,8 +354,28 @@ export default function Page() {
                   >
                     <p className="text-xs text-gray-500">Error ID: {item.id}</p>
                     <p className="mt-1 text-sm text-gray-700">
-                      <span className="font-semibold">Error Type ID:</span>{" "}
-                      {item.reviewErrorTypeId ?? "--"}
+                      <span className="font-semibold">Error Type:</span>{" "}
+                      {item.reviewErrorTypeName ??
+                        item.reviewErrorTypeId ??
+                        "--"}
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                      <span
+                        className={`rounded-full px-2 py-0.5 font-semibold capitalize ${mapSeverityBadge(item.reviewErrorTypeSeverity)}`}
+                      >
+                        {item.reviewErrorTypeSeverity ?? "unknown"}
+                      </span>
+                      {typeof item.reviewErrorTypeScoreImpact === "number" && (
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 font-semibold text-gray-700">
+                          Impact: {item.reviewErrorTypeScoreImpact}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-sm text-gray-700">
+                      <span className="font-semibold">Type Description:</span>{" "}
+                      {item.reviewErrorTypeDescription?.trim()
+                        ? item.reviewErrorTypeDescription
+                        : "--"}
                     </p>
                     <p className="mt-1 text-sm text-gray-700">
                       <span className="font-semibold">Description:</span>{" "}
