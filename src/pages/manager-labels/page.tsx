@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -89,6 +90,8 @@ const LABEL_COLORS = [
 ];
 
 const PAGE_LIMIT = 10;
+const DEFAULT_LABEL_COLOR = "#3b82f6";
+const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 
 type PaginationResult<T> = {
   data: T[];
@@ -103,8 +106,17 @@ const truncateText = (value: string, maxLength: number) => {
   return `${value.slice(0, maxLength)}...`;
 };
 
-const normalizeColor = (value: unknown): string | undefined => {
-  return typeof value === "string" ? value : undefined;
+const normalizeHexColor = (value: unknown): string | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return HEX_COLOR_REGEX.test(normalized) ? normalized : undefined;
+};
+
+const getColorOrDefault = (value: unknown): string => {
+  return normalizeHexColor(value) ?? DEFAULT_LABEL_COLOR;
 };
 
 export default function ManagerLabelsPage({
@@ -116,7 +128,10 @@ export default function ManagerLabelsPage({
   const user = getUserInfo();
 
   const [labels, setLabels] = useState<Label[]>(() => {
-    return initialLabels ?? [];
+    return (initialLabels ?? []).map((label) => ({
+      ...label,
+      color: getColorOrDefault(label.color),
+    }));
   });
   const hasLabels = labels.length > 0;
   const [labelCategories, setLabelCategories] = useState<LabelCategory[]>([]);
@@ -128,7 +143,14 @@ export default function ManagerLabelsPage({
   const [creatingLabel, setCreatingLabel] = useState(false);
   const [labelName, setLabelName] = useState("");
   const [labelDescription, setLabelDescription] = useState("");
-  const [labelColors, setLabelColors] = useState<string[]>([]);
+  const [labelColors, setLabelColors] = useState<string[]>([
+    DEFAULT_LABEL_COLOR,
+  ]);
+  const [customColorOptions, setCustomColorOptions] = useState<string[]>([]);
+  const [showCreateColorPicker, setShowCreateColorPicker] = useState(false);
+  const [showEditColorPicker, setShowEditColorPicker] = useState(false);
+  const [createCustomColor, setCreateCustomColor] =
+    useState(DEFAULT_LABEL_COLOR);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [orderBy, setOrderBy] = useState<"Name" | "Date created">(
@@ -140,7 +162,8 @@ export default function ManagerLabelsPage({
   const [activeLabel, setActiveLabel] = useState<Label | null>(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [editColors, setEditColors] = useState<string[]>([]);
+  const [editColors, setEditColors] = useState<string[]>([DEFAULT_LABEL_COLOR]);
+  const [editCustomColor, setEditCustomColor] = useState(DEFAULT_LABEL_COLOR);
   const [editCategories, setEditCategories] = useState<string[]>([]);
   const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
   const [questionText, setQuestionText] = useState("");
@@ -259,7 +282,7 @@ export default function ManagerLabelsPage({
       const rawCategories = Array.isArray(label.categories)
         ? (label.categories as Array<{ id: string; name?: string }>)
         : [];
-      const color = normalizeColor((label as { color?: unknown }).color);
+      const color = getColorOrDefault((label as { color?: unknown }).color);
 
       return {
         id: label.id,
@@ -367,9 +390,44 @@ export default function ManagerLabelsPage({
   const resetCreateLabelForm = () => {
     setLabelName("");
     setLabelDescription("");
-    setLabelColors([]);
+    setLabelColors([DEFAULT_LABEL_COLOR]);
+    setCreateCustomColor(DEFAULT_LABEL_COLOR);
+    setShowCreateColorPicker(false);
     setSelectedCategoryIds([]);
     setCreateQuestions([]);
+  };
+
+  const colorOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        [...LABEL_COLORS, ...customColorOptions]
+          .map((color) => normalizeHexColor(color))
+          .filter((color): color is string => Boolean(color)),
+      ),
+    );
+  }, [customColorOptions]);
+
+  const setCreateSelectedColor = (value: string) => {
+    const normalized = getColorOrDefault(value);
+    setLabelColors([normalized]);
+    setCreateCustomColor(normalized);
+  };
+
+  const setEditSelectedColor = (value: string) => {
+    const normalized = getColorOrDefault(value);
+    setEditColors([normalized]);
+    setEditCustomColor(normalized);
+  };
+
+  const addCustomColorOption = (value: string) => {
+    const normalized = normalizeHexColor(value);
+    if (!normalized) {
+      return;
+    }
+
+    setCustomColorOptions((prev) =>
+      prev.includes(normalized) ? prev : [...prev, normalized],
+    );
   };
 
   const toggleSelection = (
@@ -390,7 +448,7 @@ export default function ManagerLabelsPage({
     setCreatingLabel(true);
 
     try {
-      const createColor = normalizeColor(labelColors[0] as unknown);
+      const createColor = getColorOrDefault(labelColors[0] as unknown);
       const createPayload: CreateLabelPayload = {
         name: labelName.trim() || "Untitled Label",
         description: labelDescription.trim() || undefined,
@@ -433,7 +491,7 @@ export default function ManagerLabelsPage({
         ? (createdLabel.categories as Array<{ id: string; name?: string }>)
         : selectedCategoryIds.map((id) => ({ id }));
 
-      const createdColor = normalizeColor(
+      const createdColor = normalizeHexColor(
         (createdLabel as { color?: unknown }).color,
       );
 
@@ -442,7 +500,7 @@ export default function ManagerLabelsPage({
         name: createdLabel.name,
         description: createdLabel.description ?? undefined,
         questions: mapQuestions(createdQuestions),
-        color: createdColor ?? normalizeColor(labelColors[0] as unknown),
+        color: createdColor ?? createColor,
         categories: mapCategories(categoryRefs, categoryMap),
         createdAt: createdLabel.createdAt,
         updatedAt: createdLabel.updatedAt ?? createdLabel.createdAt,
@@ -459,10 +517,14 @@ export default function ManagerLabelsPage({
   };
 
   const handleOpenLabelEdit = (label: Label) => {
+    const labelColor = getColorOrDefault(label.color);
     setActiveLabel(label);
     setEditName(label.name);
     setEditDescription(label.description ?? "");
-    setEditColors(label.color ? [label.color] : []);
+    setEditColors([labelColor]);
+    setEditCustomColor(labelColor);
+    addCustomColorOption(labelColor);
+    setShowEditColorPicker(false);
     setEditCategories((label.categories ?? []).map((category) => category.id));
     setEditQuestions(label.questions ?? []);
     setIsEditLabelOpen(true);
@@ -490,7 +552,7 @@ export default function ManagerLabelsPage({
     setUpdatingLabel(true);
 
     try {
-      const updateColor = normalizeColor(editColors[0] as unknown);
+      const updateColor = getColorOrDefault(editColors[0] as unknown);
       const updatePayload: UpdateLabelPayload = {
         name: editName.trim() || activeLabel.name,
         description: editDescription.trim() || undefined,
@@ -546,7 +608,7 @@ export default function ManagerLabelsPage({
         ? (updatedLabel.categories as Array<{ id: string; name?: string }>)
         : editCategories.map((id) => ({ id }));
 
-      const updatedColor = normalizeColor(
+      const updatedColor = normalizeHexColor(
         (updatedLabel as { color?: unknown }).color,
       );
 
@@ -555,7 +617,7 @@ export default function ManagerLabelsPage({
         name: updatedLabel.name,
         description: updatedLabel.description ?? undefined,
         questions: mergedQuestions,
-        color: updatedColor ?? normalizeColor(editColors[0] as unknown),
+        color: updatedColor ?? updateColor,
         categories: mapCategories(updatedCategoryRefs, categoryMap),
         updatedAt: updatedLabel.updatedAt ?? activeLabel.updatedAt,
       };
@@ -775,6 +837,11 @@ export default function ManagerLabelsPage({
     }));
   }, [labelCategories]);
 
+  const fetchLabelStatistics = useCallback(
+    () => getLabelStatistics(undefined),
+    [],
+  );
+
   return (
     <div className="w-full bg-white px-6 py-5">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -798,7 +865,7 @@ export default function ManagerLabelsPage({
         <div className="h-px w-full bg-gray-200" />
 
         <StatisticsSummary
-          fetchStatistics={() => getLabelStatistics(undefined)}
+          fetchStatistics={fetchLabelStatistics}
           cards={[
             { key: "totalLabels", label: "Total labels" },
             { key: "labelsWithQuestions", label: "With questions" },
@@ -929,7 +996,7 @@ export default function ManagerLabelsPage({
                 <div className="flex items-center gap-3">
                   <span
                     className="flex h-6 w-6 items-center justify-center rounded-md border border-gray-200"
-                    style={{ backgroundColor: label.color ?? "#f3f4f6" }}
+                    style={{ backgroundColor: getColorOrDefault(label.color) }}
                   >
                     <span className="h-2.5 w-2.5 rounded-full bg-white/80" />
                   </span>
@@ -1125,21 +1192,59 @@ export default function ManagerLabelsPage({
                         Color
                       </label>
                       <div className="flex flex-wrap items-center gap-2">
-                        {LABEL_COLORS.map((color) => (
+                        {colorOptions.map((color) => (
                           <button
                             key={color}
                             type="button"
-                            onClick={() => setLabelColors([color])}
+                            onClick={() => setCreateSelectedColor(color)}
                             className={`h-6 w-6 rounded-full border ${
-                              labelColors.includes(color)
+                              labelColors[0] === color
                                 ? "border-gray-900 ring-2 ring-gray-900/20"
                                 : "border-gray-200"
                             }`}
                             style={{ backgroundColor: color }}
-                            aria-pressed={labelColors.includes(color)}
+                            aria-pressed={labelColors[0] === color}
                           />
                         ))}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowCreateColorPicker((prev) => !prev)
+                          }
+                          className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          {showCreateColorPicker
+                            ? "Hide picker"
+                            : "More colors"}
+                        </button>
                       </div>
+                      {showCreateColorPicker && (
+                        <div className="flex items-center gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+                          <input
+                            type="color"
+                            value={createCustomColor}
+                            onChange={(event) =>
+                              setCreateCustomColor(
+                                getColorOrDefault(event.target.value),
+                              )
+                            }
+                            className="h-8 w-11 cursor-pointer rounded border border-gray-300 bg-white p-1"
+                          />
+                          <span className="text-xs font-semibold text-gray-700">
+                            {createCustomColor.toUpperCase()}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              addCustomColorOption(createCustomColor);
+                              setCreateSelectedColor(createCustomColor);
+                            }}
+                            className="rounded-md bg-gray-800 px-2 py-1 text-xs font-semibold text-white hover:bg-gray-900"
+                          >
+                            Use color
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-2">
@@ -1459,21 +1564,57 @@ export default function ManagerLabelsPage({
                         Color
                       </label>
                       <div className="flex flex-wrap items-center gap-2">
-                        {LABEL_COLORS.map((color) => (
+                        {colorOptions.map((color) => (
                           <button
                             key={color}
                             type="button"
-                            onClick={() => setEditColors([color])}
+                            onClick={() => setEditSelectedColor(color)}
                             className={`h-6 w-6 rounded-full border ${
-                              editColors.includes(color)
+                              editColors[0] === color
                                 ? "border-gray-900 ring-2 ring-gray-900/20"
                                 : "border-gray-200"
                             }`}
                             style={{ backgroundColor: color }}
-                            aria-pressed={editColors.includes(color)}
+                            aria-pressed={editColors[0] === color}
                           />
                         ))}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowEditColorPicker((prev) => !prev)
+                          }
+                          className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          {showEditColorPicker ? "Hide picker" : "More colors"}
+                        </button>
                       </div>
+                      {showEditColorPicker && (
+                        <div className="flex items-center gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+                          <input
+                            type="color"
+                            value={editCustomColor}
+                            onChange={(event) =>
+                              setEditCustomColor(
+                                getColorOrDefault(event.target.value),
+                              )
+                            }
+                            className="h-8 w-11 cursor-pointer rounded border border-gray-300 bg-white p-1"
+                          />
+                          <span className="text-xs font-semibold text-gray-700">
+                            {editCustomColor.toUpperCase()}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              addCustomColorOption(editCustomColor);
+                              setEditSelectedColor(editCustomColor);
+                            }}
+                            className="rounded-md bg-gray-800 px-2 py-1 text-xs font-semibold text-white hover:bg-gray-900"
+                          >
+                            Use color
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-2">

@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useState,
   type FormEvent,
@@ -43,6 +44,11 @@ export default function AdminAccountsPage() {
     useState<AdminUser["status"]>("Active");
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
+  );
+
+  const fetchAccountStatistics = useCallback(
+    () => getAccountStatistics(false),
+    [],
   );
 
   const handleCreateUser = async (event: FormEvent) => {
@@ -187,7 +193,7 @@ export default function AdminAccountsPage() {
 
       <StatisticsSummary
         className="mb-4"
-        fetchStatistics={() => getAccountStatistics(false)}
+        fetchStatistics={fetchAccountStatistics}
         cards={[
           { key: "totalAccounts", label: "Total accounts" },
           { key: "adminCount", label: "Admins" },

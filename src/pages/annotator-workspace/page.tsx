@@ -376,9 +376,10 @@ export default function AnnotatorWorkspacePage() {
 
   const canSubmitFileForReview = useMemo(
     () =>
-      selectedFile?.status === "in_annotation" ||
-      selectedFile?.status === "requires_fix",
-    [selectedFile?.status],
+      (selectedFile?.status === "in_annotation" ||
+        selectedFile?.status === "requires_fix") &&
+      assignedFileLabels.length > 0,
+    [assignedFileLabels.length, selectedFile?.status],
   );
 
   useEffect(() => {
