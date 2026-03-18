@@ -1,7 +1,10 @@
 import api from "../api/axios";
+import type { ApiResponse } from "../interface/common/api-response.interface";
+import type { SingleChartStatisticDto } from "../interface/project/dtos/chart-statistic.dto";
 import type { CompleteProjectDto } from "../interface/project/dtos/complete-project.dto";
 import type { CreateProjectDto } from "../interface/project/dtos/create-project.dto";
 import type { FilterProjectQueryDto } from "../interface/project/dtos/filter-project-query.dto";
+import type { GetChartStatisticsQueryDto } from "../interface/project/dtos/get-chart-statistic.dto";
 import type { UpdateProjectDto } from "../interface/project/dtos/update-project.dto";
 
 const buildCreateProjectFormData = (
@@ -118,6 +121,32 @@ export const getProjectStatistics = async (createdById?: string) => {
     const resp = await api.get(
       `/projects/statistics${query ? `?${query}` : ""}`,
     );
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getProjectChartStatistics = async (
+  query: GetChartStatisticsQueryDto = {},
+): Promise<ApiResponse<SingleChartStatisticDto[]>> => {
+  try {
+    const queryParams = new URLSearchParams();
+
+    if (query.mode) queryParams.append("mode", query.mode);
+    if (query.value !== undefined)
+      queryParams.append("value", query.value.toString());
+    if (query.startDate) queryParams.append("startDate", query.startDate);
+    if (query.endDate) queryParams.append("endDate", query.endDate);
+    if (query.intervalCount !== undefined)
+      queryParams.append("intervalCount", query.intervalCount.toString());
+    if (query.createdById) queryParams.append("createdById", query.createdById);
+
+    const queryString = queryParams.toString();
+    const resp = await api.get<ApiResponse<SingleChartStatisticDto[]>>(
+      `/projects/chart-statistics${queryString ? `?${queryString}` : ""}`,
+    );
+
     return resp.data;
   } catch (error) {
     throw error;
