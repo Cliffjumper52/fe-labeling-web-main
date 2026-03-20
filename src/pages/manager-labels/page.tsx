@@ -32,7 +32,6 @@ import { getAllCategories } from "../../services/label-category-service.service"
 import { ConfirmButton } from "../../components/common/confirm-modal";
 import Pagination from "../../components/common/pagination";
 import StatisticsSummary from "../../components/common/statistics-summary";
-import { useAuth } from "../../context/auth-context.context";
 
 type UiLabelCategory = {
   id: string;
@@ -124,8 +123,6 @@ export default function ManagerLabelsPage({
   initialLabels,
 }: ManagerLabelsPageProps) {
   const isAdmin = mode === "admin";
-  const { getUserInfo } = useAuth();
-  const user = getUserInfo();
 
   const [labels, setLabels] = useState<Label[]>(() => {
     return (initialLabels ?? []).map((label) => ({

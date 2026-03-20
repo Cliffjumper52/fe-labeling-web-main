@@ -94,7 +94,7 @@ const parseReviewError = (value: unknown): ParsedReviewError | null => {
     breakdown?: unknown;
   };
 
-  const breakdown = Array.isArray(raw.breakdown)
+  const breakdown = (Array.isArray(raw.breakdown)
     ? raw.breakdown
         .map((item) => {
           if (!item || typeof item !== "object") {
@@ -121,8 +121,8 @@ const parseReviewError = (value: unknown): ParsedReviewError | null => {
                 : undefined,
           } satisfies ReviewErrorBreakdownItem;
         })
-        .filter((item): item is ReviewErrorBreakdownItem => item !== null)
-    : [];
+        .filter((item) => item !== null)
+    : []) as ReviewErrorBreakdownItem[];
 
   return {
     totalFileLabeled: Number(raw.totalFileLabeled ?? 0),

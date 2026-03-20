@@ -22,8 +22,4 @@ export type HexDigit =
   | "E"
   | "F";
 
-export type HexColor =
-  | `#${HexDigit}${HexDigit}${HexDigit}`
-  | `#${HexDigit}${HexDigit}${HexDigit}${HexDigit}`
-  | `#${HexDigit}${HexDigit}${HexDigit}${HexDigit}${HexDigit}${HexDigit}`
-  | `#${HexDigit}${HexDigit}${HexDigit}${HexDigit}${HexDigit}${HexDigit}${HexDigit}${HexDigit}`;
+export type HexColor = `#${string}`;

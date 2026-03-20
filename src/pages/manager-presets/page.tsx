@@ -21,7 +21,6 @@ import { getAllLabels } from "../../services/label-service.service";
 import { ConfirmButton } from "../../components/common/confirm-modal";
 import Pagination from "../../components/common/pagination";
 import StatisticsSummary from "../../components/common/statistics-summary";
-import { useAuth } from "../../context/auth-context.context";
 
 type Preset = {
   id: string;
@@ -50,7 +49,6 @@ export default function ManagerPresetsPage({
   initialPresets,
 }: ManagerPresetsPageProps) {
   const isAdmin = mode === "admin";
-  const { getUserInfo } = useAuth();
   const [presets, setPresets] = useState<Preset[]>(() => initialPresets ?? []);
   const hasPresets = presets.length > 0;
   const [labels, setLabels] = useState<ApiLabel[]>([]);
@@ -92,8 +90,6 @@ export default function ManagerPresetsPage({
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
-
-  const user = getUserInfo();
 
   const labelMap = useMemo(() => {
     return new Map(labels.map((label) => [label.id, label.name]));
