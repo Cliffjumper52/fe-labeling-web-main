@@ -375,29 +375,45 @@ export default function AnnotatorWorkspacePage() {
   };
 
   return (
-    <div className="w-full bg-white px-6 py-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="w-full bg-gradient-to-b from-slate-50 via-white to-emerald-50/30 px-4 py-5 sm:px-6">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 shadow-sm backdrop-blur sm:px-5">
         <div>
+<<<<<<< Updated upstream
           <h2 className="text-xl font-semibold text-gray-800">
             Workspace: {task.projectName}
           </h2>
           <p className="text-sm text-gray-500">
             {task.dataset} • Item {task.itemName}
+=======
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+            Annotator Workspace
+          </p>
+          <h2 className="mt-1 text-xl font-semibold text-slate-900 sm:text-2xl">
+            Workspace: {project?.name ?? "Project Workspace"}
+          </h2>
+          <p className="text-sm text-slate-600">
+            Task {taskById?.id ?? id ?? "--"} - {assignedFiles.length} files
+>>>>>>> Stashed changes
           </p>
         </div>
         <div className="flex items-center gap-3">
           <span
+<<<<<<< Updated upstream
             className={`rounded-md px-3 py-1 text-xs font-semibold ${
               isSubmitted
+=======
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              showPendingReviewBadge
+>>>>>>> Stashed changes
                 ? "bg-amber-100 text-amber-700"
-                : "bg-blue-100 text-blue-700"
+                : "bg-sky-100 text-sky-700"
             }`}
           >
             {isSubmitted ? "Pending Review" : "In Progress"}
           </span>
           <Link
             to="/annotator/tasks"
-            className="rounded-md border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:-translate-y-[1px] hover:border-slate-400 hover:bg-slate-50"
           >
             Back to tasks
           </Link>
