@@ -209,12 +209,23 @@ export default function AnnotatorTasksPage() {
   }, []);
 
   return (
-    <div className="w-full bg-white px-6 py-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="w-full bg-gradient-to-b from-slate-50 via-white to-sky-50/40 px-4 py-5 sm:px-6">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 shadow-sm backdrop-blur sm:px-5">
         <div>
+<<<<<<< Updated upstream
           <h2 className="text-xl font-semibold text-gray-800">My Tasks</h2>
           <p className="text-sm text-gray-500">
             Assigned work queue with AI pre-label status and checklist guidance.
+=======
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">
+            Annotator Control Desk
+          </p>
+          <h2 className="mt-1 text-xl font-semibold text-slate-900 sm:text-2xl">
+            My Tasks
+          </h2>
+          <p className="text-sm text-slate-600">
+            Live tasks assigned to your account.
+>>>>>>> Stashed changes
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -233,7 +244,7 @@ export default function AnnotatorTasksPage() {
         </div>
       </div>
 
-      <div className="mb-4 h-px w-full bg-gray-200" />
+      <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr_1fr_1fr]">
         <div className="flex flex-col gap-1">
