@@ -63,7 +63,7 @@ export const deleteManyNotifications = async (notificationIds: string[]) => {
 
 export const markAllNotificationsAsRead = async () => {
   try {
-    const resp = await api.post("/notifications/read-all");
+    const resp = await api.patch("/notifications/read-all");
     console.log("[markAllNotificationsAsRead]", resp.data);
     return resp.data;
   } catch (error) {
