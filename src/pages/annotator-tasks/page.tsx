@@ -515,6 +515,3 @@ export default function AnnotatorTasksPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}

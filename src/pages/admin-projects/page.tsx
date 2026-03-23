@@ -58,6 +58,7 @@ export default function AdminProjectsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+<<<<<<< Updated upstream
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState<ProjectForm>(defaultForm);
 
@@ -81,6 +82,13 @@ export default function AdminProjectsPage() {
       toast.error("Failed to load labels");
     }
   };
+=======
+  return <ManagerProjectsPage mode="admin" initialProjects={sampleProjects} />;
+ const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [detailItem, setDetailItem] = useState<ProjectItem | null>(null);
+  const [closingDetail, setClosingDetail] = useState(false);
+>>>>>>> Stashed changes
 
   const fetchProjects = async (nextPage = page) => {
     setLoading(true);
@@ -104,6 +112,7 @@ export default function AdminProjectsPage() {
   };
 
   useEffect(() => {
+<<<<<<< Updated upstream
     void fetchLabels();
     void fetchProjects(1);
   }, []);
@@ -166,6 +175,12 @@ export default function AdminProjectsPage() {
 
   const onDelete = async (id: string) => {
     if (!window.confirm("Delete this project?")) return;
+=======
+    void fetchProjects(1);
+  }, []);
+
+  const onDelete = async (id: string) => {
+>>>>>>> Stashed changes
     try {
       await deleteProject(id);
       toast.success("Project deleted");
@@ -175,10 +190,22 @@ export default function AdminProjectsPage() {
     }
   };
 
+<<<<<<< Updated upstream
+=======
+  const closeDetailModal = () => {
+    setClosingDetail(true);
+    window.setTimeout(() => {
+      setDetailItem(null);
+      setClosingDetail(false);
+    }, 200);
+  };
+
+>>>>>>> Stashed changes
   return (
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold text-gray-800">Projects</h2>
+<<<<<<< Updated upstream
         <button
           type="button"
           className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
@@ -186,6 +213,8 @@ export default function AdminProjectsPage() {
         >
           New project
         </button>
+=======
+>>>>>>> Stashed changes
       </div>
 
       <div className="mb-4 flex gap-2">
@@ -197,7 +226,11 @@ export default function AdminProjectsPage() {
         />
         <button
           type="button"
+<<<<<<< Updated upstream
           className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold"
+=======
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold hover:bg-gray-50"
+>>>>>>> Stashed changes
           onClick={() => void fetchProjects(1)}
         >
           Refresh
@@ -213,9 +246,19 @@ export default function AdminProjectsPage() {
           <span>Actions</span>
         </div>
         {loading ? (
+<<<<<<< Updated upstream
           <div className="px-4 py-6 text-sm text-gray-500">Loading projects...</div>
         ) : projects.length === 0 ? (
           <div className="px-4 py-6 text-sm text-gray-500">No projects found.</div>
+=======
+          <div className="px-4 py-6 text-sm text-gray-500">
+            Loading projects...
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="px-4 py-6 text-sm text-gray-500">
+            No projects found.
+          </div>
+>>>>>>> Stashed changes
         ) : (
           projects.map((item) => (
             <div
@@ -235,6 +278,7 @@ export default function AdminProjectsPage() {
                 <button
                   type="button"
                   className="text-blue-600 hover:text-blue-700"
+<<<<<<< Updated upstream
                   onClick={() => openEdit(item)}
                 >
                   Edit
@@ -246,6 +290,22 @@ export default function AdminProjectsPage() {
                 >
                   Delete
                 </button>
+=======
+                  onClick={() => setDetailItem(item)}
+                >
+                  Detail
+                </button>
+                <ConfirmButton
+                  label="Delete"
+                  variant="danger"
+                  size="sm"
+                  className="!h-auto !border-0 !bg-transparent !p-0 text-red-600 hover:text-red-700 hover:!bg-transparent"
+                  modalHeader="Delete this project?"
+                  modalBody={`Are you sure you want to delete ${item.name}? This action cannot be undone.`}
+                  confirmLabel="Delete"
+                  onConfirm={() => onDelete(item.id)}
+                />
+>>>>>>> Stashed changes
               </div>
             </div>
           ))
@@ -274,6 +334,7 @@ export default function AdminProjectsPage() {
         </button>
       </div>
 
+<<<<<<< Updated upstream
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <form
@@ -406,6 +467,55 @@ export default function AdminProjectsPage() {
               </button>
             </div>
           </form>
+=======
+      {/* Detail Modal */}
+      {detailItem && (
+        <div
+          className={`fixed inset-0 flex items-center justify-center bg-black/50 transition-opacity duration-200 ${closingDetail ? "opacity-0" : "opacity-100"}`}
+        >
+          <div
+            className={`w-96 rounded-lg bg-white p-6 shadow-lg transition-transform duration-200 ${closingDetail ? "scale-95" : "scale-100"}`}
+          >
+            <h3 className="mb-4 text-lg font-semibold text-gray-800">
+              Project Details
+            </h3>
+            <div className="space-y-3 text-sm">
+              <div>
+                <label className="font-medium text-gray-700">Name</label>
+                <p className="mt-1 text-gray-600">{detailItem.name}</p>
+              </div>
+              <div>
+                <label className="font-medium text-gray-700">Description</label>
+                <p className="mt-1 text-gray-600">
+                  {detailItem.description || "No description"}
+                </p>
+              </div>
+              <div>
+                <label className="font-medium text-gray-700">Data Type</label>
+                <p className="mt-1 text-gray-600">{detailItem.dataType}</p>
+              </div>
+              <div>
+                <label className="font-medium text-gray-700">Status</label>
+                <p className="mt-1 text-gray-600">{detailItem.projectStatus}</p>
+              </div>
+              <div>
+                <label className="font-medium text-gray-700">Created</label>
+                <p className="mt-1 text-gray-600">
+                  {new Date(detailItem.createdAt).toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={closeDetailModal}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+>>>>>>> Stashed changes
         </div>
       )}
     </div>

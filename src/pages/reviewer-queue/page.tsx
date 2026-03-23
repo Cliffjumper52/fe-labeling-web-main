@@ -6,8 +6,12 @@ import {
   type SetStateAction,
 } from "react";
 import { createPortal } from "react-dom";
+<<<<<<< Updated upstream
 import { Link } from "react-router-dom";
 import { type StoredImageRef } from "../../utils/image-store";
+=======
+import { getReviewerCurrentTasks } from "../../services/reviewer-api";
+>>>>>>> Stashed changes
 
 type TaskStatus = "In Progress" | "Pending Review" | "Returned" | "Completed";
 type Severity = "Low" | "Medium" | "High";
@@ -42,6 +46,7 @@ type ReviewTask = {
   severity?: Severity;
 };
 
+<<<<<<< Updated upstream
 const ANNOTATOR_TASKS_STORAGE_KEY = "annotator-assigned-tasks";
 const ANNOTATOR_TASKS_UPDATED_EVENT = "annotator-tasks-updated";
 const ADMIN_USERS_STORAGE_KEY = "admin-users";
@@ -54,6 +59,10 @@ type AdminStorageUser = {
   status: "Active" | "Suspended";
   phone: string;
 };
+=======
+const REVIEWER_TASKS_STORAGE_KEY = "reviewer-tasks-queue";
+const REVIEWER_TASKS_UPDATED_EVENT = "reviewer-tasks-updated";
+>>>>>>> Stashed changes
 
 const seedTasks: ReviewTask[] = [
   {
@@ -105,7 +114,7 @@ const loadTasks = (): ReviewTask[] => {
     return seedTasks;
   }
 
-  const raw = localStorage.getItem(ANNOTATOR_TASKS_STORAGE_KEY);
+  const raw = localStorage.getItem(REVIEWER_TASKS_STORAGE_KEY);
   if (!raw) {
     return seedTasks;
   }
@@ -167,8 +176,8 @@ const getCurrentReviewerIdentity = (): { keys: string[]; id: string | null } => 
 };
 
 const saveTasks = (tasks: ReviewTask[]) => {
-  localStorage.setItem(ANNOTATOR_TASKS_STORAGE_KEY, JSON.stringify(tasks));
-  window.dispatchEvent(new CustomEvent(ANNOTATOR_TASKS_UPDATED_EVENT));
+  localStorage.setItem(REVIEWER_TASKS_STORAGE_KEY, JSON.stringify(tasks));
+  window.dispatchEvent(new CustomEvent(REVIEWER_TASKS_UPDATED_EVENT));
 };
 
 const scoreFromSeverity = (severity: Severity) => {
@@ -179,6 +188,8 @@ const scoreFromSeverity = (severity: Severity) => {
 
 export default function ReviewerQueuePage() {
   const [tasks, setTasks] = useState<ReviewTask[]>(() => loadTasks());
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "All">(
     "All",
@@ -194,13 +205,54 @@ export default function ReviewerQueuePage() {
     {},
   );
 
+  // Fetch tasks from API
   useEffect(() => {
-    const refresh = () => setTasks(loadTasks());
-    window.addEventListener("storage", refresh);
-    window.addEventListener(ANNOTATOR_TASKS_UPDATED_EVENT, refresh);
+    let mounted = true;
+    const fetchTasks = async () => {
+      try {
+        const apiTasks = await getReviewerCurrentTasks();
+        if (!mounted) return;
+
+        // Convert API ReviewerTask to ReviewTask with seed data defaults
+        const convertedTasks = apiTasks.map((apiTask) => ({
+          id: apiTask.id,
+          projectName: apiTask.projectName,
+          dataset: apiTask.dataset,
+          priority: apiTask.priority,
+          status: apiTask.status as TaskStatus,
+          assignedAt: apiTask.assignedAt,
+          dueAt: apiTask.dueAt,
+          aiPrelabel: "Ready" as const,
+          preset: apiTask.preset,
+          progress: apiTask.progress,
+          instructions: ["Review annotator submission according to project guidelines."],
+          checklist: ["Verify accuracy", "Check completeness"],
+          assignedAnnotators: apiTask.annotatorName ? [apiTask.annotatorName] : [],
+        } satisfies ReviewTask));
+
+        if (convertedTasks.length > 0) {
+          setTasks(convertedTasks);
+          localStorage.setItem(REVIEWER_TASKS_STORAGE_KEY, JSON.stringify(convertedTasks));
+          window.dispatchEvent(new CustomEvent(REVIEWER_TASKS_UPDATED_EVENT));
+        }
+        setLoadError("");
+      } catch {
+        if (mounted) setLoadError("Can not load reviewer tasks from API. Showing local data.");
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    };
+
+    void fetchTasks();
+
+    const refreshTasks = () => setTasks(loadTasks());
+    window.addEventListener("storage", refreshTasks);
+    window.addEventListener(REVIEWER_TASKS_UPDATED_EVENT, refreshTasks);
+
     return () => {
-      window.removeEventListener("storage", refresh);
-      window.removeEventListener(ANNOTATOR_TASKS_UPDATED_EVENT, refresh);
+      mounted = false;
+      window.removeEventListener("storage", refreshTasks);
+      window.removeEventListener(REVIEWER_TASKS_UPDATED_EVENT, refreshTasks);
     };
   }, []);
 
@@ -328,8 +380,24 @@ export default function ReviewerQueuePage() {
   };
 
   return (
+<<<<<<< Updated upstream
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+=======
+    <div className="w-full bg-gradient-to-b from-slate-50 via-white to-cyan-50/25 px-4 py-5 sm:px-6">
+      {isLoading && (
+        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+          Loading tasks from API...
+        </div>
+      )}
+      {loadError && (
+        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          {loadError}
+        </div>
+      )}
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 shadow-sm backdrop-blur sm:px-5">
+>>>>>>> Stashed changes
         <div>
           <h2 className="text-xl font-semibold text-gray-800">Review Queue</h2>
           <p className="text-sm text-gray-500">
@@ -404,6 +472,7 @@ export default function ReviewerQueuePage() {
               <span>Action</span>
             </div>
 
+<<<<<<< Updated upstream
             {filteredTasks.map((task) => (
               <div
                 key={task.id}
@@ -438,6 +507,12 @@ export default function ReviewerQueuePage() {
                     Inspect
                   </Link>
                 </div>
+=======
+            {filteredTasks.length === 0 ? (
+              <div className="px-4 py-10 text-center">
+                <p className="text-sm font-semibold text-slate-700">No tasks match current filters</p>
+                <p className="mt-1 text-xs text-slate-500">Try changing status or turning off urgent-only mode.</p>
+>>>>>>> Stashed changes
               </div>
             ))}
           </div>

@@ -63,6 +63,7 @@ export default function AdminLabelsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+<<<<<<< Updated upstream
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState<LabelForm>(defaultForm);
 
@@ -82,6 +83,14 @@ export default function AdminLabelsPage() {
       toast.error("Failed to load label categories");
     }
   };
+=======
+  return <ManagerLabelsPage mode="admin" initialLabels={sampleLabels} />;
+ = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [detailItem, setDetailItem] = useState<LabelItem | null>(null);
+  const [closingDetail, setClosingDetail] = useState(false);
+>>>>>>> Stashed changes
 
   const fetchLabels = async (nextPage = page) => {
     setLoading(true);
@@ -105,6 +114,7 @@ export default function AdminLabelsPage() {
   };
 
   useEffect(() => {
+<<<<<<< Updated upstream
     void fetchCategories();
     void fetchLabels(1);
   }, []);
@@ -181,6 +191,12 @@ export default function AdminLabelsPage() {
 
   const onDelete = async (id: string) => {
     if (!window.confirm("Delete this label?")) return;
+=======
+    void fetchLabels(1);
+  }, []);
+
+  const onDelete = async (id: string) => {
+>>>>>>> Stashed changes
     try {
       await deleteLabel(id);
       toast.success("Label deleted");
@@ -190,10 +206,22 @@ export default function AdminLabelsPage() {
     }
   };
 
+<<<<<<< Updated upstream
+=======
+  const closeDetailModal = () => {
+    setClosingDetail(true);
+    window.setTimeout(() => {
+      setDetailItem(null);
+      setClosingDetail(false);
+    }, 200);
+  };
+
+>>>>>>> Stashed changes
   return (
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold text-gray-800">Labels</h2>
+<<<<<<< Updated upstream
         <button
           type="button"
           className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
@@ -201,6 +229,8 @@ export default function AdminLabelsPage() {
         >
           New label
         </button>
+=======
+>>>>>>> Stashed changes
       </div>
 
       <div className="mb-4 flex gap-2">
@@ -212,7 +242,11 @@ export default function AdminLabelsPage() {
         />
         <button
           type="button"
+<<<<<<< Updated upstream
           className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold"
+=======
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold hover:bg-gray-50"
+>>>>>>> Stashed changes
           onClick={() => void fetchLabels(1)}
         >
           Refresh
@@ -228,9 +262,19 @@ export default function AdminLabelsPage() {
           <span>Actions</span>
         </div>
         {loading ? (
+<<<<<<< Updated upstream
           <div className="px-4 py-6 text-sm text-gray-500">Loading labels...</div>
         ) : labels.length === 0 ? (
           <div className="px-4 py-6 text-sm text-gray-500">No labels found.</div>
+=======
+          <div className="px-4 py-6 text-sm text-gray-500">
+            Loading labels...
+          </div>
+        ) : labels.length === 0 ? (
+          <div className="px-4 py-6 text-sm text-gray-500">
+            No labels found.
+          </div>
+>>>>>>> Stashed changes
         ) : (
           labels.map((item) => (
             <div
@@ -247,6 +291,7 @@ export default function AdminLabelsPage() {
                 <button
                   type="button"
                   className="text-blue-600 hover:text-blue-700"
+<<<<<<< Updated upstream
                   onClick={() => openEdit(item)}
                 >
                   Edit
@@ -258,6 +303,22 @@ export default function AdminLabelsPage() {
                 >
                   Delete
                 </button>
+=======
+                  onClick={() => setDetailItem(item)}
+                >
+                  Detail
+                </button>
+                <ConfirmButton
+                  label="Delete"
+                  variant="danger"
+                  size="sm"
+                  className="!h-auto !border-0 !bg-transparent !p-0 text-red-600 hover:text-red-700 hover:!bg-transparent"
+                  modalHeader="Delete this label?"
+                  modalBody={`Are you sure you want to delete ${item.name}? This action cannot be undone.`}
+                  confirmLabel="Delete"
+                  onConfirm={() => onDelete(item.id)}
+                />
+>>>>>>> Stashed changes
               </div>
             </div>
           ))
@@ -286,6 +347,7 @@ export default function AdminLabelsPage() {
         </button>
       </div>
 
+<<<<<<< Updated upstream
       {isCreateOpen && (
         <LabelFormModal
           title="Create label"
@@ -402,6 +464,69 @@ function LabelFormModal({
           </button>
         </div>
       </form>
+=======
+      {/* Detail Modal */}
+      {detailItem && (
+        <div
+          className={`fixed inset-0 flex items-center justify-center bg-black/50 transition-opacity duration-200 ${closingDetail ? "opacity-0" : "opacity-100"}`}
+        >
+          <div
+            className={`w-96 rounded-lg bg-white p-6 shadow-lg transition-transform duration-200 ${closingDetail ? "scale-95" : "scale-100"}`}
+          >
+            <h3 className="mb-4 text-lg font-semibold text-gray-800">
+              Label Details
+            </h3>
+            <div className="space-y-3 text-sm">
+              <div>
+                <label className="font-medium text-gray-700">Name</label>
+                <p className="mt-1 text-gray-600">{detailItem.name}</p>
+              </div>
+              <div>
+                <label className="font-medium text-gray-700">Description</label>
+                <p className="mt-1 text-gray-600">
+                  {detailItem.description || "No description"}
+                </p>
+              </div>
+              <div>
+                <label className="font-medium text-gray-700">Color</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <div
+                    className="h-6 w-6 rounded-md border border-gray-300"
+                    style={{ backgroundColor: detailItem.color || "#22c55e" }}
+                  />
+                  <p className="text-gray-600">
+                    {detailItem.color || "#22c55e"}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <label className="font-medium text-gray-700">Categories</label>
+                <p className="mt-1 text-gray-600">
+                  {(detailItem.categories ?? [])
+                    .map((c) => c.name)
+                    .join(", ") || "-"}
+                </p>
+              </div>
+              <div>
+                <label className="font-medium text-gray-700">Created</label>
+                <p className="mt-1 text-gray-600">
+                  {new Date(detailItem.createdAt).toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={closeDetailModal}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+>>>>>>> Stashed changes
     </div>
   );
 }
