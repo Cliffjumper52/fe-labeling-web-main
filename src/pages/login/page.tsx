@@ -192,22 +192,35 @@ export default function LoginPage() {
               </div>
 
               <div
-                className={`login-system-status ${
-                  isSystemReady ? "is-ready" : "is-unavailable"
+                className={`mb-3 flex gap-3 rounded-xl border p-3 ${
+                  isCheckingHealth
+                    ? "border-slate-400/35 bg-slate-900/40"
+                    : isSystemReady
+                      ? "border-emerald-400/45 bg-emerald-950/25"
+                      : "border-amber-400/45 bg-amber-950/25"
                 }`}
               >
-                <div className="login-system-status-icon" aria-hidden="true">
+                <div
+                  className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-sm font-bold ${
+                    isCheckingHealth
+                      ? "bg-slate-400/20 text-slate-200"
+                      : isSystemReady
+                        ? "bg-emerald-400/20 text-emerald-300"
+                        : "bg-amber-400/20 text-amber-300"
+                  }`}
+                  aria-hidden="true"
+                >
                   {isSystemReady ? "✓" : "!"}
                 </div>
                 <div>
-                  <strong>
+                  <strong className="text-base font-bold leading-tight text-slate-50">
                     {isCheckingHealth
                       ? "Checking system status"
                       : isSystemReady
                         ? "System Ready"
                         : "System Unavailable"}
                   </strong>
-                  <p>
+                  <p className="mt-1 text-[13px] leading-[1.4] text-slate-200/75">
                     {isCheckingHealth
                       ? "Verifying backend availability before enabling sign in."
                       : isSystemReady
