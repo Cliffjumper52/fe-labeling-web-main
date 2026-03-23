@@ -6,6 +6,7 @@ interface LoginFormProps {
   initialPassword?: string;
   initialRememberMe?: boolean;
   isLoading?: boolean;
+  canSubmit?: boolean;
   handleForgotPassword?: () => void;
 }
 
@@ -15,6 +16,7 @@ export default function LoginForm({
   initialPassword = "",
   initialRememberMe = false,
   isLoading = false,
+  canSubmit = true,
   handleForgotPassword,
 }: LoginFormProps) {
   const [email, setEmail] = useState(initialEmail);
@@ -136,12 +138,14 @@ export default function LoginForm({
 
       <button
         type="submit"
-        disabled={isLoading}
+        disabled={isLoading || !canSubmit}
         className={`login-submit ${
-          isLoading ? "opacity-60 cursor-not-allowed" : "hover:brightness-110"
+          isLoading || !canSubmit
+            ? "opacity-60 cursor-not-allowed"
+            : "hover:brightness-110"
         }`}
       >
-        {isLoading ? "Logging in..." : "Login"}
+        {isLoading ? "Signing in..." : "Sign in"}
       </button>
     </form>
   );

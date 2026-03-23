@@ -53,21 +53,11 @@ h6 {
 	background: transparent;
 	width: 100%;
 	display: flex;
-	flex-direction: column;
 }
 
 .app-canvas {
 	position: relative;
 	min-height: 100vh;
-	isolation: isolate;
-	width: 100%;
-	display: flex;
-	flex-direction: column;
-	flex: 1;
-}
-
-.app-footer {
-	margin-top: auto;
 }
 
 .app-canvas::before {
@@ -369,49 +359,6 @@ h6 {
 	line-height: 1.6;
 }
 
-.login-metrics {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 10px;
-}
-
-.login-metric {
-	background: rgba(15, 23, 42, 0.4);
-	border-radius: 12px;
-	padding: 12px;
-	border: 1px solid rgba(148, 163, 184, 0.3);
-}
-
-.login-metric span {
-	font-size: 12px;
-	color: rgba(226, 232, 240, 0.7);
-}
-
-.login-metric strong {
-	display: block;
-	font-size: 18px;
-	margin-top: 6px;
-	color: #f8fafc;
-}
-
-.login-role-chips {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-}
-
-.login-role-chips span {
-	padding: 6px 10px;
-	border-radius: 999px;
-	font-size: 11px;
-	font-weight: 600;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: #dbeafe;
-	background: rgba(37, 99, 235, 0.2);
-	border: 1px solid rgba(147, 197, 253, 0.35);
-}
-
 .login-form-head {
 	margin-bottom: 14px;
 }
@@ -426,6 +373,62 @@ h6 {
 	margin-top: 6px;
 	font-size: 14px;
 	color: rgba(226, 232, 240, 0.75);
+}
+
+.login-system-status {
+	display: flex;
+	gap: 12px;
+	padding: 12px;
+	border-radius: 12px;
+	border: 1px solid rgba(148, 163, 184, 0.35);
+	background: rgba(15, 23, 42, 0.42);
+	margin-bottom: 12px;
+}
+
+.login-system-status-icon {
+	width: 22px;
+	height: 22px;
+	border-radius: 999px;
+	display: grid;
+	place-items: center;
+	font-size: 14px;
+	font-weight: 700;
+	flex-shrink: 0;
+	margin-top: 2px;
+}
+
+.login-system-status strong {
+	font-size: 16px;
+	font-weight: 700;
+	color: #f8fafc;
+	line-height: 1.2;
+}
+
+.login-system-status p {
+	margin: 3px 0 0;
+	font-size: 13px;
+	color: rgba(226, 232, 240, 0.75);
+	line-height: 1.4;
+}
+
+.login-system-status.is-ready {
+	border-color: rgba(16, 185, 129, 0.45);
+	background: rgba(6, 95, 70, 0.18);
+}
+
+.login-system-status.is-ready .login-system-status-icon {
+	background: rgba(16, 185, 129, 0.22);
+	color: #34d399;
+}
+
+.login-system-status.is-unavailable {
+	border-color: rgba(251, 146, 60, 0.42);
+	background: rgba(124, 45, 18, 0.22);
+}
+
+.login-system-status.is-unavailable .login-system-status-icon {
+	background: rgba(251, 146, 60, 0.22);
+	color: #fdba74;
 }
 
 .login-form {
@@ -578,10 +581,6 @@ h6 {
 @media (max-width: 560px) {
 	.login-title {
 		font-size: 30px;
-	}
-
-	.login-metrics {
-		grid-template-columns: 1fr;
 	}
 
 	.login-row {
