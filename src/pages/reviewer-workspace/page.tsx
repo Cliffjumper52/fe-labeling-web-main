@@ -763,6 +763,8 @@ export default function ReviewerWorkspacePage() {
   const handleSubmitReview = async () => {
     if (!workflowFileLabelId || !workflowLabelId) return;
 
+    const submittedWorkflowFileLabelId = workflowFileLabelId;
+
     if (workflowReviewChecklistQuestions.length === 0) {
       setSubmitReviewError("No reviewer checklist questions available.");
       return;
@@ -801,7 +803,27 @@ export default function ReviewerWorkspacePage() {
 
       setSelectedReviewErrorsByFileLabelId((prev) => {
         const next = { ...prev };
-        delete next[workflowFileLabelId];
+        delete next[submittedWorkflowFileLabelId];
+        return next;
+      });
+      setReviewChecklistAnswersByFileLabelId((prev) => {
+        const next = { ...prev };
+        delete next[submittedWorkflowFileLabelId];
+        return next;
+      });
+      setReviewChecklistNotesByFileLabelId((prev) => {
+        const next = { ...prev };
+        delete next[submittedWorkflowFileLabelId];
+        return next;
+      });
+      setReviewDecisionByFileLabelId((prev) => {
+        const next = { ...prev };
+        delete next[submittedWorkflowFileLabelId];
+        return next;
+      });
+      setReviewFeedbackByFileLabelId((prev) => {
+        const next = { ...prev };
+        delete next[submittedWorkflowFileLabelId];
         return next;
       });
       setReviewerFileLabelsReloadToken((prev) => prev + 1);

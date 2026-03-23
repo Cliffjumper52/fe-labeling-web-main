@@ -26,6 +26,7 @@ type AuthContextValue = {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  isInitializing: boolean;
   setAuthTokens: (
     accessToken?: string | null,
     refreshToken?: string | null,
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [refreshToken, setRefreshToken] = useState<string | null>(
     getRefreshToken(),
   );
+  const [isInitializing, setIsInitializing] = useState(false);
 
   const syncTokensFromCookies = useCallback(() => {
     setAccessToken(getAccessToken());
@@ -63,6 +65,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     ) => {
       persistAuthTokens(nextAccessToken, nextRefreshToken, options);
       syncTokensFromCookies();
+      // Mark as initializing so guard waits for user info to be loaded
+      if (nextAccessToken) {
+        setIsInitializing(true);
+      }
     },
     [syncTokensFromCookies],
   );
@@ -93,6 +99,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       } catch {
         logout();
+      } finally {
+        // Mark initialization as complete
+        setIsInitializing(false);
       }
     },
     [logout],
@@ -122,6 +131,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       accessToken,
       refreshToken,
       isAuthenticated: Boolean(accessToken),
+      isInitializing,
       setAuthTokens,
       getUserInfo,
       setUserInfo,
@@ -130,6 +140,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [
       accessToken,
       refreshToken,
+      isInitializing,
       setAuthTokens,
       getUserInfo,
       setUserInfo,

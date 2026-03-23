@@ -13,6 +13,7 @@ export type StatisticCardDefinition = {
 type StatisticsSummaryProps = {
   cards: StatisticCardDefinition[];
   fetchStatistics: () => Promise<unknown>;
+  refreshKey?: number;
   className?: string;
 };
 
@@ -60,6 +61,7 @@ const toDisplayValue = (value: StatisticValue): string => {
 export default function StatisticsSummary({
   cards,
   fetchStatistics,
+  refreshKey,
   className,
 }: StatisticsSummaryProps) {
   const [isLoading, setIsLoading] = useState(true);
@@ -88,7 +90,7 @@ export default function StatisticsSummary({
 
   useEffect(() => {
     void loadStatistics();
-  }, [loadStatistics]);
+  }, [loadStatistics, refreshKey]);
 
   return (
     <div className={className}>

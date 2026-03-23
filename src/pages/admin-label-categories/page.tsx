@@ -68,6 +68,7 @@ export default function AdminLabelCategoriesPage() {
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
+  const [statisticsRefreshKey, setStatisticsRefreshKey] = useState(0);
 
   const fetchCategories = async (nextPage = page) => {
     setLoading(true);
@@ -110,6 +111,7 @@ export default function AdminLabelCategoriesPage() {
       toast.success("Category created");
       setIsCreateOpen(false);
       setCreateForm(defaultForm);
+      setStatisticsRefreshKey((prev) => prev + 1);
       await fetchCategories(1);
     } catch {
       toast.error("Cannot create category");
@@ -142,6 +144,7 @@ export default function AdminLabelCategoriesPage() {
       });
       toast.success("Category updated");
       setEditing(null);
+      setStatisticsRefreshKey((prev) => prev + 1);
       await fetchCategories(page);
     } catch {
       toast.error("Cannot update category");
@@ -154,6 +157,7 @@ export default function AdminLabelCategoriesPage() {
     try {
       await deleteCategory(id);
       toast.success("Category deleted");
+      setStatisticsRefreshKey((prev) => prev + 1);
       await fetchCategories(page);
     } catch {
       toast.error("Cannot delete category");
@@ -204,6 +208,7 @@ export default function AdminLabelCategoriesPage() {
       <StatisticsSummary
         className="mb-4"
         fetchStatistics={getLabelCategoryStatistics}
+        refreshKey={statisticsRefreshKey}
         cards={[
           { key: "totalCategories", label: "Total categories" },
           { key: "categoriesWithLabels", label: "With labels" },

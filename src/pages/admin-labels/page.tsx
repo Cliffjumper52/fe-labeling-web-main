@@ -42,6 +42,7 @@ export default function AdminLabelsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [detailItem, setDetailItem] = useState<LabelItem | null>(null);
   const [closingDetail, setClosingDetail] = useState(false);
+  const [statisticsRefreshKey, setStatisticsRefreshKey] = useState(0);
 
   const fetchLabels = async (nextPage = page) => {
     setLoading(true);
@@ -72,6 +73,7 @@ export default function AdminLabelsPage() {
     try {
       await deleteLabel(id);
       toast.success("Label deleted");
+      setStatisticsRefreshKey((prev) => prev + 1);
       await fetchLabels(page);
     } catch {
       toast.error("Cannot delete label");
@@ -95,6 +97,7 @@ export default function AdminLabelsPage() {
       <StatisticsSummary
         className="mb-4"
         fetchStatistics={getLabelStatistics}
+        refreshKey={statisticsRefreshKey}
         cards={[
           { key: "totalLabels", label: "Total labels" },
           { key: "labelsWithQuestions", label: "With questions" },
