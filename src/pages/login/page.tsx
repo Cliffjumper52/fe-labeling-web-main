@@ -1,9 +1,10 @@
 import { toast } from "sonner";
 import { login } from "../../services/auth-service.service";
 import LoginForm from "../../components/login/login-form";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/auth-context.context";
+import { checkHealth } from "../../services/health.service";
 import {
   getRememberMePreference,
   getRememberedLoginIdentifier,
@@ -11,16 +12,51 @@ import {
 } from "../../utils/auth-storage";
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isSystemReady, setIsSystemReady] = useState(false);
+  const [isCheckingHealth, setIsCheckingHealth] = useState(true);
   const navigate = useNavigate();
   const { setAuthTokens, setUserInfo, getUserInfo } = useAuth();
   const rememberedPreference = getRememberMePreference();
   const rememberedLoginIdentifier = getRememberedLoginIdentifier();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const verifySystemHealth = async () => {
+      setIsCheckingHealth(true);
+      try {
+        const resp = await checkHealth();
+        if (isMounted) {
+          setIsSystemReady(resp?.status === 200);
+        }
+      } catch {
+        if (isMounted) {
+          setIsSystemReady(false);
+        }
+      } finally {
+        if (isMounted) {
+          setIsCheckingHealth(false);
+        }
+      }
+    };
+
+    verifySystemHealth();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleLogin = async (
     email: string,
     password: string,
     rememberMe: boolean,
   ) => {
+    if (!isSystemReady) {
+      toast.error("System is not ready yet. Please wait and try again.");
+      return;
+    }
+
     // console.log(email, password);
     setIsLoading(true);
     try {
@@ -71,37 +107,75 @@ export default function LoginPage() {
         <div className="login-card">
           <aside className="login-aside">
             <div>
-              <h2>Enterprise-grade labeling operations</h2>
+              <h2>Data Labeling Studio</h2>
               <p>
-                Track projects, label taxonomies, and preset templates across
-                teams in a single control room designed for scale.
+                Enterprise-grade labeling operations designed for scale. Track
+                projects, manage taxonomies, and coordinate teams in one unified
+                workspace.
               </p>
             </div>
 
-            <div className="login-metrics">
-              <div className="login-metric">
-                <span>Active projects</span>
-                <strong>18</strong>
-              </div>
-              <div className="login-metric">
-                <span>Labels in use</span>
-                <strong>94</strong>
-              </div>
-              <div className="login-metric">
-                <span>Review queue</span>
-                <strong>1,240</strong>
-              </div>
-              <div className="login-metric">
-                <span>Avg. QA time</span>
-                <strong>3.2h</strong>
-              </div>
+            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+              <article className="flex flex-col rounded-xl border border-slate-400/30 bg-slate-950/40 p-3">
+                <span className="text-xs text-slate-200/70">Collaboration</span>
+                <strong className="mt-1.5 block text-xl leading-tight tracking-[-0.01em] text-slate-50">
+                  Multi-Team Coordination
+                </strong>
+                <p className="mt-0.5 text-[13px] text-slate-200/70">
+                  Coordinate workstreams across roles.
+                </p>
+              </article>
+              <article className="flex flex-col rounded-xl border border-slate-400/30 bg-slate-950/40 p-3">
+                <span className="text-xs text-slate-200/70">
+                  Infrastructure
+                </span>
+                <strong className="mt-1.5 block text-xl leading-tight tracking-[-0.01em] text-slate-50">
+                  Built for Scale
+                </strong>
+                <p className="mt-0.5 text-[13px] text-slate-200/70">
+                  Enterprise-ready platform operations.
+                </p>
+              </article>
+              <article className="flex flex-col rounded-xl border border-slate-400/30 bg-slate-950/40 p-3">
+                <span className="text-xs text-slate-200/70">
+                  Review Procedure
+                </span>
+                <strong className="mt-1.5 block text-xl leading-tight tracking-[-0.01em] text-slate-50">
+                  Mandatory QA Review
+                </strong>
+                <p className="mt-0.5 text-[13px] text-slate-200/70">
+                  All annotator submissions are reviewed.
+                </p>
+              </article>
+              <article className="flex flex-col rounded-xl border border-slate-400/30 bg-slate-950/40 p-3">
+                <span className="text-xs text-slate-200/70">
+                  Decision Workflow
+                </span>
+                <strong className="mt-1.5 block text-xl leading-tight tracking-[-0.01em] text-slate-50">
+                  Checklist-Based Logic
+                </strong>
+                <p className="mt-0.5 text-[13px] text-slate-200/70">
+                  Logical decisions guided by checklists.
+                </p>
+              </article>
             </div>
 
-            <div className="login-role-chips">
-              <span>Admin</span>
-              <span>Manager</span>
-              <span>Annotator</span>
-              <span>Reviewer</span>
+            <p className="mb-[-6px] mt-1 text-xs uppercase tracking-[0.08em] text-blue-200/70">
+              Available roles
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-full border border-sky-300/35 bg-blue-500/20 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-blue-100">
+                Admin
+              </span>
+              <span className="rounded-full border border-sky-300/35 bg-blue-500/20 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-blue-100">
+                Manager
+              </span>
+              <span className="rounded-full border border-sky-300/35 bg-blue-500/20 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-blue-100">
+                Annotator
+              </span>
+              <span className="rounded-full border border-sky-300/35 bg-blue-500/20 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-blue-100">
+                Reviewer
+              </span>
             </div>
 
             <p>
@@ -114,11 +188,39 @@ export default function LoginPage() {
             <div className="login-card-body">
               <div className="login-form-head">
                 <h3>Welcome back</h3>
-                <p>Sign in to continue to your assigned workspace.</p>
+                <p>Sign in to continue to your workspace</p>
               </div>
+
+              <div
+                className={`login-system-status ${
+                  isSystemReady ? "is-ready" : "is-unavailable"
+                }`}
+              >
+                <div className="login-system-status-icon" aria-hidden="true">
+                  {isSystemReady ? "✓" : "!"}
+                </div>
+                <div>
+                  <strong>
+                    {isCheckingHealth
+                      ? "Checking system status"
+                      : isSystemReady
+                        ? "System Ready"
+                        : "System Unavailable"}
+                  </strong>
+                  <p>
+                    {isCheckingHealth
+                      ? "Verifying backend availability before enabling sign in."
+                      : isSystemReady
+                        ? "All systems operational. You can now sign in."
+                        : "Cannot reach backend health endpoint. Sign in is disabled."}
+                  </p>
+                </div>
+              </div>
+
               <LoginForm
                 onLogin={handleLogin}
                 isLoading={isLoading}
+                canSubmit={isSystemReady && !isCheckingHealth}
                 initialEmail={
                   rememberedPreference ? rememberedLoginIdentifier : ""
                 }
