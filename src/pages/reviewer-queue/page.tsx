@@ -123,6 +123,7 @@ export default function ReviewerQueuePage() {
   const [reviewComment, setReviewComment] = useState("");
   const [activeReviewImageIndex, setActiveReviewImageIndex] = useState(0);
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>({});
+  const [onlyUrgent, setOnlyUrgent] = useState(false);
 
   useEffect(() => {
     const refresh = () => setTasks(loadTasks());
@@ -152,9 +153,13 @@ export default function ReviewerQueuePage() {
         task.projectName.toLowerCase().includes(search.toLowerCase()) ||
         task.dataset.toLowerCase().includes(search.toLowerCase());
       const byStatus = statusFilter === "All" || task.status === statusFilter;
-      return bySearch && byStatus;
+      const byUrgent =
+        !onlyUrgent ||
+        task.priority === "High" ||
+        task.status === "Returned";
+      return bySearch && byStatus && byUrgent;
     });
-  }, [tasks, search, statusFilter]);
+  }, [tasks, search, statusFilter, onlyUrgent]);
 
   const stats = useMemo(() => {
     return {
@@ -255,46 +260,49 @@ export default function ReviewerQueuePage() {
   };
 
   return (
-    <div className="w-full bg-white px-6 py-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="w-full bg-gradient-to-b from-slate-50 via-white to-cyan-50/25 px-4 py-5 sm:px-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 shadow-sm backdrop-blur sm:px-5">
         <div>
-          <h2 className="text-xl font-semibold text-gray-800">Review Queue</h2>
-          <p className="text-sm text-gray-500">
-            Inspect pending submissions, approve or reject with categorized errors.
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700">
+            Reviewer Command Desk
+          </p>
+          <h2 className="mt-1 text-xl font-semibold text-slate-900 sm:text-2xl">Review Queue</h2>
+          <p className="text-sm text-slate-600">
+            Inspect submissions, approve quickly, and return precise feedback.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+          <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
             Pending: {stats.pending}
           </span>
-          <span className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
             Approved: {stats.approved}
           </span>
-          <span className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+          <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700">
             Rejected: {stats.rejected}
           </span>
         </div>
       </div>
 
-      <div className="mb-4 h-px w-full bg-gray-200" />
+      <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.8fr_1fr_1fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.8fr_1fr_1fr_auto]">
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-gray-700">Search</label>
+          <label className="text-xs font-semibold text-slate-700">Search</label>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
             placeholder="Search project or dataset..."
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-gray-700">Status</label>
+          <label className="text-xs font-semibold text-slate-700">Status</label>
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value as TaskStatus | "All")}
             title="Filter by status"
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
           >
             <option value="Pending Review">Pending Review</option>
             <option value="Returned">Returned</option>
@@ -303,22 +311,36 @@ export default function ReviewerQueuePage() {
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-gray-700">Order by</label>
+          <label className="text-xs font-semibold text-slate-700">Order by</label>
           <select
             title="Order tasks"
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
           >
             <option>Assigned date</option>
             <option>Due date</option>
             <option>Priority</option>
           </select>
         </div>
+
+        <div className="flex items-end">
+          <button
+            type="button"
+            onClick={() => setOnlyUrgent((prev) => !prev)}
+            className={`w-full rounded-md border px-3 py-2 text-sm font-semibold transition ${
+              onlyUrgent
+                ? "border-rose-300 bg-rose-50 text-rose-700"
+                : "border-slate-300 bg-white text-slate-700"
+            }`}
+          >
+            {onlyUrgent ? "Urgent only: ON" : "Urgent only"}
+          </button>
+        </div>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <div className="min-w-[860px]">
-            <div className="grid grid-cols-[1.7fr_1.4fr_0.9fr_0.9fr_1.2fr] items-center gap-2 border-b bg-gray-50 px-4 py-3 text-xs font-semibold uppercase text-gray-600">
+            <div className="grid grid-cols-[1.7fr_1.4fr_0.9fr_0.9fr_1.2fr] items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase text-slate-600">
               <span>Project</span>
               <span>Dataset</span>
               <span>Status</span>
@@ -326,6 +348,7 @@ export default function ReviewerQueuePage() {
               <span>Action</span>
             </div>
 
+<<<<<<< Updated upstream
             {filteredTasks.map((task) => (
               <div
                 key={task.id}
@@ -367,8 +390,50 @@ export default function ReviewerQueuePage() {
                     Workspace
                   </Link>
                 </div>
+=======
+            {filteredTasks.length === 0 ? (
+              <div className="px-4 py-10 text-center">
+                <p className="text-sm font-semibold text-slate-700">No tasks match current filters</p>
+                <p className="mt-1 text-xs text-slate-500">Try changing status or turning off urgent-only mode.</p>
+>>>>>>> Stashed changes
               </div>
-            ))}
+            ) : (
+              filteredTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="grid grid-cols-[1.7fr_1.4fr_0.9fr_0.9fr_1.2fr] items-center gap-2 border-b border-slate-100 px-4 py-3 text-sm last:border-b-0"
+                >
+                  <div>
+                    <p className="font-semibold text-slate-800">{task.projectName}</p>
+                    <p className="text-xs text-slate-500">Due {task.dueAt}</p>
+                  </div>
+                  <p className="text-slate-600">{task.dataset}</p>
+                  <span
+                    className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${
+                      task.status === "Pending Review"
+                        ? "bg-amber-100 text-amber-700"
+                        : task.status === "Completed"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-rose-100 text-rose-700"
+                    }`}
+                  >
+                    {task.status}
+                  </span>
+                  <p className="text-xs text-slate-600">
+                    {task.assignedAnnotators?.join(", ") || "Unassigned"}
+                  </p>
+                  <div className="flex items-center gap-3 text-sm font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenInspect(task)}
+                      className="rounded-md border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-cyan-700 hover:border-cyan-300 hover:bg-cyan-100"
+                    >
+                      Inspect
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
