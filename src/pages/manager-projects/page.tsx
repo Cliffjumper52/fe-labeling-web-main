@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
 import type { ApiResponse } from "../../interface/common/api-response.interface";
 import type { DataType } from "../../interface/enums/domain.enums";
 import type { LabelPreset as ApiLabelPreset } from "../../interface/label-preset/label-preset.interface";
@@ -141,8 +147,15 @@ export default function ManagerProjectsPage() {
   const [presetsLoading, setPresetsLoading] = useState(false);
   const [selectedPresetIds, setSelectedPresetIds] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [statisticsRefreshKey, setStatisticsRefreshKey] = useState(0);
 
   const user = getUserInfo();
+
+  const fetchProjectStatistics = useCallback(
+    () => getProjectStatistics(user?.id),
+    [user?.id],
+  );
+
   const visibleProjects = useMemo(() => {
     if (projectStatusFilter === "all") {
       return projects;
@@ -291,6 +304,7 @@ export default function ManagerProjectsPage() {
       }
 
       setProjects((prev) => [normalizeProject(created), ...prev]);
+      setStatisticsRefreshKey((prev) => prev + 1);
       closeCreateModal();
     } catch (error) {
       setProjectsError(extractErrorMessage(error, "Failed to create project."));
@@ -327,7 +341,8 @@ export default function ManagerProjectsPage() {
 
       <StatisticsSummary
         className="mt-4"
-        fetchStatistics={() => getProjectStatistics(user?.id)}
+        fetchStatistics={fetchProjectStatistics}
+        refreshKey={statisticsRefreshKey}
         cards={[
           { key: "totalCount", label: "Total projects" },
           { key: "activeCount", label: "Active" },

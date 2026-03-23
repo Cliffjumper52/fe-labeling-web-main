@@ -183,6 +183,7 @@ export default function ManagerLabelsPage({
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
+  const [statisticsRefreshKey, setStatisticsRefreshKey] = useState(0);
 
   const unwrapApiResponse = <T,>(payload: unknown): T | null => {
     if (!payload || typeof payload !== "object") {
@@ -504,6 +505,7 @@ export default function ManagerLabelsPage({
       };
 
       setLabels((prev) => [nextLabel, ...prev]);
+      setStatisticsRefreshKey((prev) => prev + 1);
       setIsCreateLabelOpen(false);
       resetCreateLabelForm();
     } catch (error) {
@@ -533,6 +535,7 @@ export default function ManagerLabelsPage({
     try {
       await deleteLabel(labelId);
       setLabels((prev) => prev.filter((label) => label.id !== labelId));
+      setStatisticsRefreshKey((prev) => prev + 1);
     } catch (error) {
       const message = extractErrorMessage(error, "Failed to delete label.");
       setLabelsError(message);
@@ -623,6 +626,7 @@ export default function ManagerLabelsPage({
       setLabels((prev) =>
         prev.map((label) => (label.id === activeLabel.id ? nextLabel : label)),
       );
+      setStatisticsRefreshKey((prev) => prev + 1);
       setActiveLabel(nextLabel);
       closeWithAnimation("editLabel", setIsEditLabelOpen);
     } catch (error) {
@@ -863,6 +867,7 @@ export default function ManagerLabelsPage({
 
         <StatisticsSummary
           fetchStatistics={fetchLabelStatistics}
+          refreshKey={statisticsRefreshKey}
           cards={[
             { key: "totalLabels", label: "Total labels" },
             { key: "labelsWithQuestions", label: "With questions" },

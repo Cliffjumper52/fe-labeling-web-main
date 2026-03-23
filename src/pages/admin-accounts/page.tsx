@@ -45,6 +45,7 @@ export default function AdminAccountsPage() {
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
+  const [statisticsRefreshKey, setStatisticsRefreshKey] = useState(0);
 
   const fetchAccountStatistics = useCallback(
     () => getAccountStatistics(false),
@@ -62,6 +63,7 @@ export default function AdminAccountsPage() {
         status: "Active",
       });
       setUsers((prev) => [created as AdminUser, ...prev]);
+      setStatisticsRefreshKey((prev) => prev + 1);
       toast.success("User created successfully.");
     } catch {
       toast.error("Create user failed.");
@@ -121,6 +123,7 @@ export default function AdminAccountsPage() {
     try {
       await deleteAdminAccount(userId);
       setUsers((prev) => prev.filter((user) => user.id !== userId));
+      setStatisticsRefreshKey((prev) => prev + 1);
       toast.success("User deleted.");
     } catch {
       toast.error("Delete user failed.");
@@ -167,6 +170,7 @@ export default function AdminAccountsPage() {
           user.id === editingUserId ? (remoteUpdated as AdminUser) : user,
         ),
       );
+      setStatisticsRefreshKey((prev) => prev + 1);
       toast.success("User updated.");
     } catch {
       toast.error("Update user failed.");
@@ -194,6 +198,7 @@ export default function AdminAccountsPage() {
       <StatisticsSummary
         className="mb-4"
         fetchStatistics={fetchAccountStatistics}
+        refreshKey={statisticsRefreshKey}
         cards={[
           { key: "totalAccounts", label: "Total accounts" },
           { key: "adminCount", label: "Admins" },

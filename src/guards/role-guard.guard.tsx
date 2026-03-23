@@ -2,6 +2,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/auth-context.context";
 import type { RouterItem } from "../interface";
+import Loading from "../components/common/loading/loading";
 
 type RouteGuardProps = {
   route: RouterItem;
@@ -9,7 +10,7 @@ type RouteGuardProps = {
 };
 
 export function RouteGuard({ route, children }: RouteGuardProps) {
-  const { isAuthenticated, getUserInfo } = useAuth();
+  const { isAuthenticated, isInitializing, getUserInfo } = useAuth();
   const location = useLocation();
 
   const resolveAuthenticatedHomePath = () => {
@@ -37,6 +38,11 @@ export function RouteGuard({ route, children }: RouteGuardProps) {
   // 1. Requires login but user is not authenticated
   if (route.requiresAuth && !isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // While initializing after login, show loading state instead of checking permissions
+  if (isInitializing) {
+    return <Loading />;
   }
 
   // 2. Requires specific role(s)

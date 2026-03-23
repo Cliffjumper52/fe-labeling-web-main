@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -90,6 +91,7 @@ export default function ManagerPresetsPage({
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
     {},
   );
+  const [statisticsRefreshKey, setStatisticsRefreshKey] = useState(0);
 
   const labelMap = useMemo(() => {
     return new Map(labels.map((label) => [label.id, label.name]));
@@ -251,6 +253,7 @@ export default function ManagerPresetsPage({
       resetCreatePresetForm();
       setCurrentPage(1);
       await loadPresets();
+      setStatisticsRefreshKey((prev) => prev + 1);
     } catch (error) {
       setPresetsError(extractErrorMessage(error, "Failed to create preset."));
     } finally {
@@ -334,6 +337,7 @@ export default function ManagerPresetsPage({
       setIsEditPresetOpen(false);
       resetEditPresetForm();
       await loadPresets();
+      setStatisticsRefreshKey((prev) => prev + 1);
     } catch (error) {
       setPresetsError(extractErrorMessage(error, "Failed to update preset."));
     } finally {
@@ -366,6 +370,7 @@ export default function ManagerPresetsPage({
     try {
       await deleteLabelPreset(presetId);
       setPresets((prev) => prev.filter((preset) => preset.id !== presetId));
+      setStatisticsRefreshKey((prev) => prev + 1);
     } catch (error) {
       const message = extractErrorMessage(error, "Failed to delete preset.");
       setPresetsError(message);
@@ -388,6 +393,11 @@ export default function ManagerPresetsPage({
     }, 200);
   };
 
+  const fetchPresetStatistics = useCallback(
+    () => getLabelPresetStatistics(undefined),
+    [],
+  );
+
   return (
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-3 flex items-center justify-between">
@@ -409,7 +419,8 @@ export default function ManagerPresetsPage({
 
       <StatisticsSummary
         className="mb-4"
-        fetchStatistics={() => getLabelPresetStatistics(undefined)}
+        fetchStatistics={fetchPresetStatistics}
+        refreshKey={statisticsRefreshKey}
         cards={[
           { key: "totalPresets", label: "Total presets" },
           { key: "presetsWithLabels", label: "With labels" },

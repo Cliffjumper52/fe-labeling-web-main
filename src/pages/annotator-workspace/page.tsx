@@ -792,6 +792,8 @@ export default function AnnotatorWorkspacePage() {
       return;
     }
 
+    const submittedWorkflowLabelId = workflowLabelId;
+
     if (workflowChecklistQuestions.length === 0) {
       setSubmitChecklistError("No checklist questions available to submit.");
       return;
@@ -833,6 +835,17 @@ export default function AnnotatorWorkspacePage() {
         selectedFile.id,
         "Failed to refresh files after submission.",
       );
+
+      setChecklistAnswersByLabelId((prev) => {
+        const next = { ...prev };
+        delete next[submittedWorkflowLabelId];
+        return next;
+      });
+      setSubmissionNotesByLabelId((prev) => {
+        const next = { ...prev };
+        delete next[submittedWorkflowLabelId];
+        return next;
+      });
 
       closeWorkflowModal();
     } catch (error) {

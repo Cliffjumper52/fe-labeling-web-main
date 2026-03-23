@@ -1,4 +1,5 @@
 import api, { refreshApi } from "../api/axios";
+import { getRefreshToken } from "../utils/auth-storage";
 
 const DEMO_USERS: Record<
   string,
@@ -74,8 +75,20 @@ export const resetPassword = async (email: string) => {
 
 export const refreshToken = async () => {
   try {
+    const token = getRefreshToken();
+
     //intentional, use axios directly to avoid infinite loop of interceptors when refreshing token
-    const resp = await refreshApi.post("/auth/refresh", {});
+    const resp = await refreshApi.post(
+      "/auth/refresh",
+      {},
+      token
+        ? {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        : undefined,
+    );
     return resp.data;
   } catch (error) {
     throw error;

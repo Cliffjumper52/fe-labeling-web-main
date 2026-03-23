@@ -2,6 +2,7 @@ import axios from "axios";
 import { refreshToken } from "../services/auth-service.service";
 import {
   clearAuthTokens,
+  getAccessToken,
   setAuthTokens as persistAuthTokens,
 } from "../utils/auth-storage";
 const api = axios.create({
@@ -16,7 +17,18 @@ const refreshApi = axios.create({
 
 // Request Interceptor
 api.interceptors.request.use(
-  (config) => config,
+  (config) => {
+    const token = getAccessToken();
+
+    if (token) {
+      config.headers = config.headers ?? {};
+      if (!config.headers.Authorization) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+
+    return config;
+  },
   (error) => Promise.reject(error),
 );
 
@@ -54,6 +66,12 @@ api.interceptors.response.use(
         const newRefreshToken = resultData?.refreshToken;
 
         persistAuthTokens(newAccessToken, newRefreshToken);
+
+        if (newAccessToken) {
+          originalRequest.headers = originalRequest.headers ?? {};
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        }
+
         return api(originalRequest);
       } catch (_refreshError) {
         // Handle token refresh failure (e.g., redirect to login);
