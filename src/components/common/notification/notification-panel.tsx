@@ -12,7 +12,7 @@ import {
 import { getAccessToken } from "../../../utils/auth-storage";
 import NotificationList from "./notification-list";
 
-const WS_URL = "http://localhost:2000/notifications";
+const WS_URL = `${import.meta.env.VITE_API_BASE_URL}/notifications`;
 const PAGE_LIMIT = 10;
 
 export default function NotificationPanel() {
@@ -132,29 +132,26 @@ export default function NotificationPanel() {
     });
 
     socket.on("connect_error", (err) => {
-      console.error("[NotificationPanel] Socket connection error:", err.message);
+      console.error(
+        "[NotificationPanel] Socket connection error:",
+        err.message,
+      );
     });
 
     socket.onAny((event, ...args) => {
       console.log(`[NotificationPanel] Socket event: ${event}`, args);
     });
 
-    socket.on(
-      "notification.created",
-      (payload: Notification) => {
-        setNotifications((prev) => [payload, ...prev]);
-        if (!payload.isRead) {
-          setUnreadCount((c) => c + 1);
-        }
-      },
-    );
+    socket.on("notification.created", (payload: Notification) => {
+      setNotifications((prev) => [payload, ...prev]);
+      if (!payload.isRead) {
+        setUnreadCount((c) => c + 1);
+      }
+    });
 
-    socket.on(
-      "notification.unread-count",
-      (payload: { count: number }) => {
-        setUnreadCount(payload.count);
-      },
-    );
+    socket.on("notification.unread-count", (payload: { count: number }) => {
+      setUnreadCount(payload.count);
+    });
 
     socket.on(
       "notification.read",
@@ -228,7 +225,9 @@ export default function NotificationPanel() {
     try {
       await markManyNotificationsAsRead([notification.id]);
       setNotifications((prev) =>
-        prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)),
+        prev.map((n) =>
+          n.id === notification.id ? { ...n, isRead: true } : n,
+        ),
       );
       setUnreadCount((c) => Math.max(0, c - 1));
     } catch {
@@ -257,8 +256,8 @@ export default function NotificationPanel() {
   };
 
   const handleMarkSelectedAsRead = async () => {
-    const ids = [...selectedIds].filter(
-      (id) => notifications.find((n) => n.id === id && !n.isRead),
+    const ids = [...selectedIds].filter((id) =>
+      notifications.find((n) => n.id === id && !n.isRead),
     );
     if (ids.length === 0) {
       setSelectedIds(new Set());
@@ -298,7 +297,8 @@ export default function NotificationPanel() {
         const existingIds = new Set(prev.map((n) => n.id));
         const restored = removed.filter((n) => !existingIds.has(n.id));
         return [...prev, ...restored].sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         );
       });
       setUnreadCount((c) => c + removedUnread);
@@ -398,7 +398,13 @@ export default function NotificationPanel() {
                 className="text-white/40 hover:text-white/80"
                 aria-label="Close notifications"
               >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
               </button>
