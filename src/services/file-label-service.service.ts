@@ -114,3 +114,22 @@ export const annotatorSubmitFileLabels = async (dto: AnnotatorSubmitDto) => {
     throw error;
   }
 };
+
+export interface AiLabelSuggestionResult {
+  labelId: string | null;
+  labelName: string | null;
+  confidence: number;
+  reasoning: string;
+}
+
+export const getAiLabelSuggestion = async (
+  fileId: string,
+  additionalPrompt?: string,
+): Promise<{ data: AiLabelSuggestionResult }> => {
+  const body: Record<string, string> = { fileId };
+  if (additionalPrompt) {
+    body.additionalPrompt = additionalPrompt;
+  }
+  const resp = await api.post("/file-labels/gemini/suggest", body);
+  return resp.data;
+};

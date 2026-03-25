@@ -1,5 +1,10 @@
+import { useState } from "react";
 import type { File as ProjectFile } from "../../../interface/file/file.interface";
 import type { FileLabel } from "../../../interface/file-label/file-label.interface";
+import {
+  getAiLabelSuggestion,
+  type AiLabelSuggestionResult,
+} from "../../../services/file-label-service.service";
 import { ConfirmButton } from "../../common/confirm-modal";
 
 export type AssignedLabelsWorkflowMode = "assign" | "resubmit" | "view";
@@ -64,6 +69,55 @@ export default function AssignedLabelsPanel({
   onAddLabel,
   onSubmitFileForReview,
 }: Props) {
+  const [showAiMenu, setShowAiMenu] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<AiLabelSuggestionResult | null>(
+    null,
+  );
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const handleGetAiSuggestion = async () => {
+    if (!selectedFile?.id) {
+      return;
+    }
+
+    setAiLoading(true);
+    setAiError(null);
+    setAiResult(null);
+
+    try {
+      const resp = await getAiLabelSuggestion(
+        selectedFile.id,
+        aiPrompt.trim() || undefined,
+      );
+      const suggestion = resp?.data ?? null;
+      setAiResult(suggestion);
+
+      if (suggestion?.labelName) {
+        onSelectLabel(suggestion.labelName);
+      }
+
+      setShowAiMenu(false);
+    } catch (error) {
+      setAiError(
+        error instanceof Error ? error.message : "AI suggestion failed.",
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleCloseAiMenu = () => {
+    setShowAiMenu(false);
+    setAiError(null);
+  };
+
+  const handleDismissAiResult = () => {
+    setAiResult(null);
+    setAiError(null);
+  };
+
   return (
     <div className="space-y-4 lg:max-h-[calc(100vh-150px)] lg:overflow-y-auto lg:pr-1">
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
@@ -249,6 +303,7 @@ export default function AssignedLabelsPanel({
 
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <p className="text-xs font-semibold text-gray-500">Search label</p>
+
         <input
           value={labelSearch}
           onChange={(event) => onLabelSearchChange(event.target.value)}
@@ -286,7 +341,7 @@ export default function AssignedLabelsPanel({
           </p>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-3 flex items-center gap-2">
           <button
             type="button"
             onClick={onAddLabel}
@@ -296,18 +351,115 @@ export default function AssignedLabelsPanel({
             Add
           </button>
 
-          {selectedLabel && isSelectedLabelAssigned ? (
-            <p className="mt-1 text-xs text-amber-700">
-              Label already assigned.
-            </p>
-          ) : null}
-
-          {!selectedLabel ? (
-            <p className="mt-1 text-xs text-gray-500">
-              Select a label to enable Add.
-            </p>
-          ) : null}
+          <button
+            type="button"
+            disabled={!selectedFile?.id || aiLoading}
+            onClick={() => {
+              setShowAiMenu((prev) => !prev);
+              setAiError(null);
+            }}
+            className="flex items-center gap-1 rounded-md border border-violet-300 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {aiLoading ? (
+              <>
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-400 border-t-transparent" />
+                Thinking...
+              </>
+            ) : (
+              <>✨ AI Suggest</>
+            )}
+          </button>
         </div>
+
+        {showAiMenu ? (
+          <div className="mt-2 rounded-lg border border-violet-200 bg-violet-50 p-3">
+            <p className="text-[11px] font-semibold text-gray-600">
+              AI Label Suggestion
+            </p>
+            <p className="mt-0.5 text-[11px] text-gray-500">
+              Optionally describe what you'd like the AI to focus on.
+            </p>
+            <textarea
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              rows={3}
+              placeholder="Additional prompt (optional)..."
+              className="mt-2 w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400"
+            />
+            {aiError ? (
+              <p className="mt-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] text-rose-700">
+                {aiError}
+              </p>
+            ) : null}
+            <div className="mt-2 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleCloseAiMenu}
+                className="rounded-md border border-gray-300 bg-white px-2 py-1 text-[11px] font-semibold text-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={aiLoading}
+                onClick={() => {
+                  void handleGetAiSuggestion();
+                }}
+                className="rounded-md bg-violet-600 px-2 py-1 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+              >
+                {aiLoading ? "Thinking..." : "Submit"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {aiResult ? (
+          <div
+            className={`mt-2 rounded-md border px-3 py-2.5 text-xs ${
+              aiResult.labelId
+                ? "border-violet-200 bg-violet-50"
+                : "border-amber-200 bg-amber-50"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p
+                className={`font-semibold ${aiResult.labelId ? "text-violet-800" : "text-amber-800"}`}
+              >
+                {aiResult.labelId
+                  ? `✨ AI suggests: ${aiResult.labelName ?? aiResult.labelId}`
+                  : "✨ AI made no selection"}
+              </p>
+              <button
+                type="button"
+                onClick={handleDismissAiResult}
+                className="shrink-0 text-gray-400 hover:text-gray-600"
+                aria-label="Dismiss AI result"
+              >
+                ×
+              </button>
+            </div>
+            {aiResult.labelId ? (
+              <p className="mt-0.5 text-[11px] text-violet-600">
+                Confidence: {Math.round(aiResult.confidence * 100)}%
+              </p>
+            ) : null}
+            <p
+              className={`mt-1.5 text-[11px] ${aiResult.labelId ? "text-violet-700" : "text-amber-700"}`}
+            >
+              {aiResult.reasoning}
+            </p>
+          </div>
+        ) : null}
+
+        {selectedLabel && isSelectedLabelAssigned ? (
+          <p className="mt-1 text-xs text-amber-700">Label already assigned.</p>
+        ) : null}
+
+        {!selectedLabel ? (
+          <p className="mt-1 text-xs text-gray-500">
+            Select a label to enable Add.
+          </p>
+        ) : null}
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
