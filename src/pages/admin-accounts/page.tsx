@@ -28,7 +28,6 @@ type AdminUser = {
 export default function AdminAccountsPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const hasUsers = users.length > 0;
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [newUserName, setNewUserName] = useState("");
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -46,6 +45,25 @@ export default function AdminAccountsPage() {
     {},
   );
   const [statisticsRefreshKey, setStatisticsRefreshKey] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterRole, setFilterRole] = useState("All");
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [orderBy, setOrderBy] = useState("Name");
+
+  const filteredUsers = users
+    .filter((u) => {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch =
+        !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+      const matchesRole = filterRole === "All" || u.role === filterRole;
+      const matchesStatus = filterStatus === "All" || u.status === filterStatus;
+      return matchesSearch && matchesRole && matchesStatus;
+    })
+    .sort((a, b) => {
+      if (orderBy === "Name") return a.name.localeCompare(b.name);
+      return 0;
+    });
+  const hasUsers = filteredUsers.length > 0;
 
   const fetchAccountStatistics = useCallback(
     () => getAccountStatistics(false),
@@ -236,6 +254,8 @@ export default function AdminAccountsPage() {
             <input
               className="w-full text-sm outline-none placeholder:text-gray-400"
               placeholder="Search users..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
@@ -245,6 +265,8 @@ export default function AdminAccountsPage() {
           <select
             title="Filter by role"
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+            value={filterRole}
+            onChange={(e) => setFilterRole(e.target.value)}
           >
             <option>All</option>
             <option>Admin</option>
@@ -259,6 +281,8 @@ export default function AdminAccountsPage() {
           <select
             title="Filter by status"
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
           >
             <option>All</option>
             <option>Active</option>
@@ -274,6 +298,8 @@ export default function AdminAccountsPage() {
           <select
             title="Order users"
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+            value={orderBy}
+            onChange={(e) => setOrderBy(e.target.value)}
           >
             <option>Name</option>
             <option>Date created</option>
@@ -319,7 +345,7 @@ export default function AdminAccountsPage() {
             <span>Action</span>
           </div>
 
-          {users.map((user) => (
+          {filteredUsers.map((user) => (
             <div
               key={user.id}
               className="grid grid-cols-[1.6fr_2fr_1fr_1fr_1fr] items-center gap-2 border-b px-4 py-3 text-sm last:border-b-0"
