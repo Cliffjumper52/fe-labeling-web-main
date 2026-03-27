@@ -1,8 +1,11 @@
+import { Navigate, useParams } from "react-router-dom";
 
-import { useParams } from "react-router";
-
-export default function ProjectDetail() {
+export default function ProjectDetailPage() {
   const { id } = useParams();
 
-  return <div className="h-[120vh]">ProjectDetail: {id}</div>;
+  if (!id) {
+    return <Navigate to="/manager/projects" replace />;
+  }
+
+  return <Navigate to={`/manager/projects/${id}/edit`} replace />;
 }

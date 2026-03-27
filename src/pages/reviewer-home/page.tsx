@@ -1,3 +1,5 @@
-export default function ExampleReviewerPage() {
-  return <div>Example Reviewer Page</div>;
+import { Navigate } from "react-router-dom";
+
+export default function ReviewerHomePage() {
+  return <Navigate to="/reviewer/queue" replace />;
 }
