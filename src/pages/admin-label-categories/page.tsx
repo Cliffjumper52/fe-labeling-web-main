@@ -280,7 +280,7 @@ export default function AdminLabelCategoriesPage() {
               <span className="text-gray-500">
                 {new Date(item.createdAt).toLocaleDateString()}
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-4">
                 <button
                   type="button"
                   className="text-blue-600 hover:text-blue-700 text-sm font-semibold"
@@ -290,7 +290,7 @@ export default function AdminLabelCategoriesPage() {
                 </button>
                 <button
                   type="button"
-                  className="text-blue-600 hover:text-blue-700"
+                  className="text-sm font-semibold text-blue-600 hover:text-blue-700"
                   onClick={() => openEdit(item)}
                 >
                   Edit
