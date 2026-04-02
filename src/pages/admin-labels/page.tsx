@@ -153,7 +153,7 @@ export default function AdminLabelsPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="text-blue-600 hover:text-blue-700"
+                  className="font-semibold text-blue-600 hover:text-blue-700"
                   onClick={() => setDetailItem(item)}
                 >
                   Detail
@@ -199,57 +199,87 @@ export default function AdminLabelsPage() {
       {/* Detail Modal */}
       {detailItem && (
         <div
-          className={`fixed inset-0 flex items-center justify-center bg-black/50 transition-opacity duration-200 ${closingDetail ? "opacity-0" : "opacity-100"}`}
+          className={`fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm transition-opacity duration-200 ${closingDetail ? "opacity-0" : "opacity-100"}`}
         >
           <div
-            className={`w-96 rounded-lg bg-white p-6 shadow-lg transition-transform duration-200 ${closingDetail ? "scale-95" : "scale-100"}`}
+            className={`w-full max-w-md rounded-xl bg-white shadow-2xl transition-transform duration-200 ${closingDetail ? "scale-95" : "scale-100"}`}
           >
-            <h3 className="mb-4 text-lg font-semibold text-gray-800">
-              Label Details
-            </h3>
-            <div className="space-y-3 text-sm">
-              <div>
-                <label className="font-medium text-gray-700">Name</label>
-                <p className="mt-1 text-gray-600">{detailItem.name}</p>
-              </div>
-              <div>
-                <label className="font-medium text-gray-700">Description</label>
-                <p className="mt-1 text-gray-600">
-                  {detailItem.description || "No description"}
-                </p>
-              </div>
-              <div>
-                <label className="font-medium text-gray-700">Color</label>
-                <div className="mt-1 flex items-center gap-2">
-                  <div
-                    className="h-6 w-6 rounded-md border border-gray-300"
-                    style={{ backgroundColor: detailItem.color || "#22c55e" }}
-                  />
-                  <p className="text-gray-600">
-                    {detailItem.color || "#22c55e"}
-                  </p>
+            {/* Header */}
+            <div
+              className="flex items-center justify-between rounded-t-xl px-5 py-4"
+              style={{ background: `linear-gradient(to right, ${detailItem.color ?? "#22c55e"}, ${detailItem.color ?? "#22c55e"}cc)` }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white/40 font-bold text-sm text-white"
+                  style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
+                >
+                  {detailItem.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">{detailItem.name}</p>
+                  <p className="text-xs text-white/70">Label</p>
                 </div>
               </div>
-              <div>
-                <label className="font-medium text-gray-700">Categories</label>
-                <p className="mt-1 text-gray-600">
-                  {(detailItem.categories ?? [])
-                    .map((c) => c.name)
-                    .join(", ") || "-"}
-                </p>
-              </div>
-              <div>
-                <label className="font-medium text-gray-700">Created</label>
-                <p className="mt-1 text-gray-600">
-                  {new Date(detailItem.createdAt).toLocaleString()}
-                </p>
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end">
               <button
                 type="button"
                 onClick={closeDetailModal}
-                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                className="rounded-full p-1 text-white/70 hover:bg-white/20 hover:text-white transition-colors"
+                aria-label="Close"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M6 6l12 12" />
+                  <path d="M18 6l-12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-3">
+              {/* Color swatch */}
+              <div className="flex gap-3">
+                <div className="flex-1 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Color</p>
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-md border border-gray-200 shadow-sm" style={{ backgroundColor: detailItem.color || "#22c55e" }} />
+                    <span className="font-mono text-xs text-gray-600">{detailItem.color || "#22c55e"}</span>
+                  </div>
+                </div>
+                <div className="flex-1 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Categories</p>
+                  <p className="text-sm text-gray-700">
+                    {(detailItem.categories ?? []).length > 0
+                      ? (detailItem.categories ?? []).map((c) => c.name).join(", ")
+                      : <span className="italic text-gray-400">None</span>}
+                  </p>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Description</p>
+                <p className="text-sm text-gray-700">{detailItem.description || <span className="italic text-gray-400">No description</span>}</p>
+              </div>
+
+              {/* Created & ID */}
+              <div className="flex gap-3">
+                <div className="flex-1 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Created</p>
+                  <p className="text-sm text-gray-700">{new Date(detailItem.createdAt).toLocaleDateString()}</p>
+                </div>
+                <div className="flex-1 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Label ID</p>
+                  <p className="break-all font-mono text-xs text-gray-600">{detailItem.id}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end border-t border-gray-100 px-5 py-3">
+              <button
+                type="button"
+                onClick={closeDetailModal}
+                className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
               >
                 Close
               </button>

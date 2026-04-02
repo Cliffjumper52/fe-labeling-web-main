@@ -63,6 +63,9 @@ export default function AdminLabelCategoriesPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState<CategoryForm>(defaultForm);
 
+  const [detailItem, setDetailItem] = useState<CategoryItem | null>(null);
+  const [closingDetail, setClosingDetail] = useState(false);
+
   const [editing, setEditing] = useState<CategoryItem | null>(null);
   const [editForm, setEditForm] = useState<CategoryForm>(defaultForm);
   const [closingModals, setClosingModals] = useState<Record<string, boolean>>(
@@ -190,6 +193,14 @@ export default function AdminLabelCategoriesPage() {
     }, 200);
   };
 
+  const closeDetailModal = () => {
+    setClosingDetail(true);
+    window.setTimeout(() => {
+      setDetailItem(null);
+      setClosingDetail(false);
+    }, 200);
+  };
+
   return (
     <div className="w-full bg-white px-6 py-5">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -272,6 +283,13 @@ export default function AdminLabelCategoriesPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  className="text-blue-600 hover:text-blue-700 text-sm font-semibold"
+                  onClick={() => setDetailItem(item)}
+                >
+                  Details
+                </button>
+                <button
+                  type="button"
                   className="text-blue-600 hover:text-blue-700"
                   onClick={() => openEdit(item)}
                 >
@@ -314,6 +332,73 @@ export default function AdminLabelCategoriesPage() {
           Next
         </button>
       </div>
+
+      {/* Detail Modal */}
+      {detailItem && (
+        <div
+          className={`fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm transition-opacity duration-200 ${closingDetail ? "opacity-0" : "opacity-100"}`}
+        >
+          <div
+            className={`w-full max-w-md rounded-xl bg-white shadow-2xl transition-transform duration-200 ${closingDetail ? "scale-95" : "scale-100"}`}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between rounded-t-xl bg-gradient-to-r from-teal-600 to-teal-500 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white font-bold text-sm">
+                  {detailItem.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">{detailItem.name}</p>
+                  <p className="text-xs text-teal-100">Label Category</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeDetailModal}
+                className="rounded-full p-1 text-white/70 hover:bg-white/20 hover:text-white transition-colors"
+                aria-label="Close"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M6 6l12 12" />
+                  <path d="M18 6l-12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-3">
+              {/* Description */}
+              <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Description</p>
+                <p className="text-sm text-gray-700">{detailItem.description || <span className="italic text-gray-400">No description</span>}</p>
+              </div>
+
+              {/* Created & ID */}
+              <div className="flex gap-3">
+                <div className="flex-1 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Created</p>
+                  <p className="text-sm text-gray-700">{new Date(detailItem.createdAt).toLocaleDateString()}</p>
+                </div>
+                <div className="flex-1 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Category ID</p>
+                  <p className="break-all font-mono text-xs text-gray-600">{detailItem.id}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end border-t border-gray-100 px-5 py-3">
+              <button
+                type="button"
+                onClick={closeDetailModal}
+                className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Modal */}
       {isCreateOpen && (

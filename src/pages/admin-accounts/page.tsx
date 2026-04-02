@@ -27,6 +27,8 @@ type AdminUser = {
 
 export default function AdminAccountsPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [detailUser, setDetailUser] = useState<AdminUser | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [newUserName, setNewUserName] = useState("");
@@ -368,6 +370,7 @@ export default function AdminAccountsPage() {
                 <button
                   type="button"
                   className="text-blue-600 hover:text-blue-700"
+                  onClick={() => { setDetailUser(user); setIsDetailOpen(true); }}
                 >
                   Details
                 </button>
@@ -391,6 +394,90 @@ export default function AdminAccountsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {isDetailOpen && detailUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
+          <div
+            className={`w-full max-w-md rounded-xl bg-white shadow-2xl ${
+              closingModals.detail ? "modal-pop-out" : "modal-pop"
+            }`}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between rounded-t-xl bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white font-bold text-sm">
+                  {detailUser.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">{detailUser.name}</p>
+                  <p className="text-xs text-blue-100">{detailUser.email}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => closeWithAnimation("detail", setIsDetailOpen)}
+                className="rounded-full p-1 text-white/70 hover:bg-white/20 hover:text-white transition-colors"
+                aria-label="Close"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M6 6l12 12" />
+                  <path d="M18 6l-12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4">
+              {/* Role & Status row */}
+              <div className="flex gap-3">
+                <div className="flex-1 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Role</p>
+                  <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-semibold ${
+                    detailUser.role === "Admin"
+                      ? "bg-rose-100 text-rose-700"
+                      : detailUser.role === "Manager"
+                        ? "bg-sky-100 text-sky-700"
+                        : detailUser.role === "Reviewer"
+                          ? "bg-violet-100 text-violet-700"
+                          : "bg-emerald-100 text-emerald-700"
+                  }`}>
+                    {detailUser.role}
+                  </span>
+                </div>
+                <div className="flex-1 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Status</p>
+                  <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-semibold ${
+                    detailUser.status === "Active"
+                      ? "bg-green-100 text-green-700"
+                      : detailUser.status === "Need Change Password"
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-red-100 text-red-700"
+                  }`}>
+                    {detailUser.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Account ID */}
+              <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Account ID</p>
+                <p className="break-all font-mono text-xs text-gray-600">{detailUser.id}</p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end border-t border-gray-100 px-5 py-3">
+              <button
+                type="button"
+                onClick={() => closeWithAnimation("detail", setIsDetailOpen)}
+                className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
