@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 export default function AnnotatorSidebar() {
   const links = [
     { label: "My Tasks", to: "/annotator/tasks" },
-    { label: "Submissions", to: "/annotator/submissions" },
+    { label: "Ratings", to: "/annotator/ratings" },
   ];
 
   return (

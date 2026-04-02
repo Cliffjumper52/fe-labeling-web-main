@@ -1,0 +1,154 @@
+import api from "../api/axios";
+import type { ApiResponse } from "../interface/common/api-response.interface";
+import type { SingleChartStatisticDto } from "../interface/project/dtos/chart-statistic.dto";
+import type { CompleteProjectDto } from "../interface/project/dtos/complete-project.dto";
+import type { CreateProjectDto } from "../interface/project/dtos/create-project.dto";
+import type { FilterProjectQueryDto } from "../interface/project/dtos/filter-project-query.dto";
+import type { GetChartStatisticsQueryDto } from "../interface/project/dtos/get-chart-statistic.dto";
+import type { UpdateProjectDto } from "../interface/project/dtos/update-project.dto";
+
+const buildCreateProjectFormData = (
+  dto: CreateProjectDto,
+  image?: File,
+): FormData => {
+  const formData = new FormData();
+  formData.append("name", dto.name);
+  if (dto.description) formData.append("description", dto.description);
+  formData.append("dataType", dto.dataType);
+  formData.append(
+    "availableLabelIds",
+    JSON.stringify(dto.availableLabelIds ?? []),
+  );
+  if (image) formData.append("image", image);
+  return formData;
+};
+
+const buildUpdateProjectFormData = (
+  dto: UpdateProjectDto,
+  image?: File,
+): FormData => {
+  const formData = new FormData();
+  formData.append("name", dto.name);
+  if (dto.description) formData.append("description", dto.description);
+  formData.append("dataType", dto.dataType);
+  if (image) formData.append("image", image);
+  return formData;
+};
+
+export const createProject = async (dto: CreateProjectDto, image?: File) => {
+  try {
+    const formData = buildCreateProjectFormData(dto, image);
+    const resp = await api.post("/projects", formData);
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updateProject = async (
+  id: string,
+  dto: UpdateProjectDto,
+  image?: File,
+) => {
+  try {
+    const formData = buildUpdateProjectFormData(dto, image);
+    const resp = await api.patch(`/projects/${id}`, formData);
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const deleteProject = async (id: string) => {
+  try {
+    const resp = await api.delete(`/projects/${id}`);
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getProjectsPaginated = async (filter: FilterProjectQueryDto) => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (filter.name) queryParams.append("name", filter.name);
+    if (filter.search) queryParams.append("search", filter.search);
+    if (filter.searchBy) queryParams.append("searchBy", filter.searchBy);
+    if (filter.orderBy) queryParams.append("orderBy", filter.orderBy);
+    if (filter.page) queryParams.append("page", filter.page.toString());
+    if (filter.limit) queryParams.append("limit", filter.limit.toString());
+    if (filter.order) queryParams.append("order", filter.order);
+    if (filter.includeDeleted !== undefined)
+      queryParams.append("includeDeleted", filter.includeDeleted.toString());
+    if (filter.createdById)
+      queryParams.append("createdById", filter.createdById);
+    const resp = await api.get(`/projects?${queryParams.toString()}`);
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getProjectById = async (
+  id: string,
+  includeDeleted: boolean = false,
+) => {
+  try {
+    const resp = await api.get(
+      `/projects/${id}?includeDeleted=${includeDeleted}`,
+    );
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const completeProject = async (dto: CompleteProjectDto) => {
+  try {
+    const resp = await api.post("/projects/manager/complete", dto);
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getProjectStatistics = async (createdById?: string) => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (createdById) queryParams.append("createdById", createdById);
+
+    const query = queryParams.toString();
+    const resp = await api.get(
+      `/projects/statistics${query ? `?${query}` : ""}`,
+    );
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getProjectChartStatistics = async (
+  query: GetChartStatisticsQueryDto = {},
+): Promise<ApiResponse<SingleChartStatisticDto[]>> => {
+  try {
+    const queryParams = new URLSearchParams();
+
+    if (query.mode) queryParams.append("mode", query.mode);
+    if (query.value !== undefined)
+      queryParams.append("value", query.value.toString());
+    if (query.startDate) queryParams.append("startDate", query.startDate);
+    if (query.endDate) queryParams.append("endDate", query.endDate);
+    if (query.intervalCount !== undefined)
+      queryParams.append("intervalCount", query.intervalCount.toString());
+    if (query.createdById) queryParams.append("createdById", query.createdById);
+
+    const queryString = queryParams.toString();
+    const resp = await api.get<ApiResponse<SingleChartStatisticDto[]>>(
+      `/projects/chart-statistics${queryString ? `?${queryString}` : ""}`,
+    );
+
+    return resp.data;
+  } catch (error) {
+    throw error;
+  }
+};
