@@ -274,8 +274,8 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white shadow rounded-lg p-4">
+      <div>
+        <div className="bg-white shadow rounded-lg p-4">
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div className="text-sm font-medium text-gray-700">
               Projects Created
@@ -392,23 +392,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        <div className="bg-white shadow rounded-lg p-4">
-          <div className="text-sm text-gray-500 mb-2">Recent Actions</div>
-          <ul className="space-y-2 text-sm">
-            <li className="flex justify-between">
-              <span>New project created</span>
-              <span className="text-gray-400">2h</span>
-            </li>
-            <li className="flex justify-between">
-              <span>User invited</span>
-              <span className="text-gray-400">5h</span>
-            </li>
-            <li className="flex justify-between">
-              <span>Settings updated</span>
-              <span className="text-gray-400">1d</span>
-            </li>
-          </ul>
-        </div>
+
       </div>
     </div>
   );
